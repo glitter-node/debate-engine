@@ -226,8 +226,8 @@ Website
 https://glitter.im
 
 Source code
-(GitHub repository)
+[(GitHub repository)](https://github.com/glitter-node/structured-debate)
 
 License
-
+TBD
 (To be determined)
