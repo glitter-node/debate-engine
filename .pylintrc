@@ -1,0 +1,39 @@
+[MAIN]
+persistent = no
+ignore-paths = ^app[\\/].*migrations[\\/]
+init-hook = import sys; from pathlib import Path; sys.path.insert(0, str(Path().resolve() / "app"))
+
+[MESSAGES CONTROL]
+disable =
+    C0302,
+    C0304,
+    C0305,
+    C0327,
+    R0801,
+    R0902,
+    R0904,
+    R0911,
+    R0912,
+    R0914,
+    R0915,
+    R1731,
+    W0212,
+    W0223,
+    attribute-defined-outside-init,
+    broad-exception-caught,
+    import-outside-toplevel,
+    invalid-name,
+    invalid-str-returned,
+    line-too-long,
+    missing-class-docstring,
+    missing-function-docstring,
+    missing-module-docstring,
+    too-few-public-methods,
+    too-many-ancestors,
+    wrong-import-order
+
+[TYPECHECK]
+generated-members =
+    objects,
+    _meta,
+    isoformat

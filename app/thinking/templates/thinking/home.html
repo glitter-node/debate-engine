@@ -1,0 +1,79 @@
+{% extends "thinking/base.html" %} 
+{% block title %}glitter.im{% endblock %} 
+{% block meta_description %}Explore structured theses, arguments, and counters on glitter.im.{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <h1 class="h1">Fragments of Thought</h1>
+  <p class="lead">Structured theses, arguments, and counters.</p>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <div class="card_head">
+      <h2 class="h2">Recent</h2>
+      <a class="small_link" href="{% url 'thinking:thesis_list' %}?sort=new{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}"
+        >View</a
+      >
+    </div>
+    <ul class="list">
+      {% for t in recent_theses %}
+      <li class="list_item">
+        <a class="title_link" href="{% url 'thinking:thesis_detail' pk=t.pk %}"
+          >{{ t.title }}</a
+        >
+        <div class="meta">
+          {{ t.author.username }} · {{ t.created_at|date:"Y-m-d" }}
+        </div>
+      </li>
+      {% empty %}
+      <li class="muted">No theses yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card_head">
+      <h2 class="h2">Active</h2>
+      <a class="small_link" href="{% url 'thinking:thesis_list' %}?sort=active{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}"
+        >View</a
+      >
+    </div>
+    <ul class="list">
+      {% for t in active_theses %}
+      <li class="list_item">
+        <a class="title_link" href="{% url 'thinking:thesis_detail' pk=t.pk %}"
+          >{{ t.title }}</a
+        >
+        <div class="meta">counters {{ t.counter_count }}</div>
+      </li>
+      {% empty %}
+      <li class="muted">No theses yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card_head">
+      <h2 class="h2">Unanswered</h2>
+      <a
+        class="small_link"
+        href="{% url 'thinking:thesis_list' %}?sort=unanswered{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}"
+        >View</a
+      >
+    </div>
+    <ul class="list">
+      {% for t in unanswered_theses %}
+      <li class="list_item">
+        <a class="title_link" href="{% url 'thinking:thesis_detail' pk=t.pk %}"
+          >{{ t.title }}</a
+        >
+        <div class="meta">{{ t.created_at|date:"Y-m-d" }}</div>
+      </li>
+      {% empty %}
+      <li class="muted">No theses yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

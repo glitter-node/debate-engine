@@ -1,0 +1,184 @@
+{% extends "thinking/base.html" %}
+{% load thinking_extras %}
+{% block title %}{{ thesis.title }} · glitter.im{% endblock %}
+{% block meta_description %}Read the thesis {{ thesis.title }} and its arguments and counters on glitter.im.{% endblock %}
+{% block content %}
+<article class="article">
+  <div class="article_head">
+    <h1 class="h1">{{ thesis.title }}</h1>
+    <div class="status_row">
+      <span class="badge status_badge status_{{ thesis.status }}">{{ thesis.status|title }}</span>
+      {% if thesis.deleted_at and can_moderate %}
+      <span class="badge status_badge status_deleted">Deleted</span>
+      {% endif %}
+    </div>
+    <div class="meta">
+      {{ thesis.author.username }} · {{ thesis.created_at|date:"Y-m-d H:i" }} ·
+      stance {{ thesis.stance }}
+    </div>
+  </div>
+
+  {% if thesis.status != "active" %}
+  <div class="status_banner status_{{ thesis.status }}">
+    This thesis is currently {{ thesis.status|title }}.
+  </div>
+  {% endif %}
+  {% if thesis.deleted_at and can_moderate %}
+  <div class="status_banner status_deleted">
+    This thesis is currently Deleted.
+  </div>
+  {% endif %}
+
+  {% if can_moderate %}
+  <section class="block">
+    <h2 class="h2">Thesis Moderation</h2>
+    {% if thesis_next_statuses %}
+    <form class="row" method="post" action="{% url 'thinking:moderation_thesis_set_status' pk=thesis.pk %}">
+      {% csrf_token %}
+      <label class="label" for="thesis-status-select">Change status</label>
+      <select class="select" id="thesis-status-select" name="status">
+        {% for value, label in status_choices %}
+          {% if value in thesis_next_statuses %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <button class="button" type="submit">Apply</button>
+    </form>
+    {% endif %}
+    {% if thesis.deleted_at %}
+    <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_thesis_restore' pk=thesis.pk %}">
+      {% csrf_token %}
+      <button class="button" type="submit">Restore thesis</button>
+    </form>
+    {% else %}
+    <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_thesis_delete' pk=thesis.pk %}">
+      {% csrf_token %}
+      <button class="button" type="submit">Delete thesis</button>
+    </form>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="block">
+    <h2 class="h2">Summary</h2>
+    <div class="prose">{{ thesis.summary|linebreaksbr }}</div>
+    {% if user.is_authenticated %}
+    <div class="moderation_form">
+      {% if thesis_report_open %}
+      <div class="muted">You already reported this thesis.</div>
+      {% else %}
+      <form class="row" method="post" action="{% url 'thinking:report_thesis' pk=thesis.pk %}">
+        {% csrf_token %}
+        <label class="label" for="report-thesis-reason">Report thesis</label>
+        <select class="select" id="report-thesis-reason" name="reason">
+          {% for reason in report_reason_choices %}
+          <option value="{{ reason }}">{{ reason|title }}</option>
+          {% endfor %}
+        </select>
+        <label class="label" for="report-thesis-detail">Details (optional)</label>
+        <textarea class="textarea" id="report-thesis-detail" name="detail" rows="3"></textarea>
+        <button class="button" type="submit">Submit report</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="block">
+    <div class="block_head">
+      <h2 class="h2">Arguments</h2>
+      {% if user.is_authenticated %}
+      <a class="button" href="{% url 'thinking:counter_create' pk=thesis.pk %}"
+        >Add Counter</a
+      >
+      {% endif %}
+    </div>
+
+    {% for a in arguments %}
+    <div class="argument">
+      <div class="argument_head">
+        <div class="badge">A{{ a.order }}</div>
+      </div>
+
+      <div class="prose">{{ a.body|linebreaksbr }}</div>
+
+      <div class="counters">
+        <div class="h3">Counters</div>
+        {% with counters=counters_by_argument|get_item:a.id %} {% if counters %}
+        <ul class="list">
+          {% for c in counters %}
+          <li class="list_item" id="counter-{{ c.pk }}">
+            <div class="status_row">
+              <span class="badge status_badge status_{{ c.status }}">{{ c.status|title }}</span>
+              {% if c.deleted_at and can_moderate %}
+              <span class="badge status_badge status_deleted">Deleted</span>
+              {% endif %}
+            </div>
+            <div class="prose">{{ c.body|linebreaksbr }}</div>
+            <div class="meta">
+              {{ c.author.username }} · {{ c.created_at|date:"Y-m-d H:i" }}
+            </div>
+            {% if user.is_authenticated %}
+            <div class="moderation_form">
+              {% if c.id in counter_report_open_ids %}
+              <div class="muted">You already reported this counter.</div>
+              {% else %}
+              <form class="row" method="post" action="{% url 'thinking:report_counter' pk=c.pk %}">
+                {% csrf_token %}
+                <label class="label" for="report-counter-reason-{{ c.pk }}">Report counter</label>
+                <select class="select" id="report-counter-reason-{{ c.pk }}" name="reason">
+                  {% for reason in report_reason_choices %}
+                  <option value="{{ reason }}">{{ reason|title }}</option>
+                  {% endfor %}
+                </select>
+                <label class="label" for="report-counter-detail-{{ c.pk }}">Details (optional)</label>
+                <textarea class="textarea" id="report-counter-detail-{{ c.pk }}" name="detail" rows="3"></textarea>
+                <button class="button" type="submit">Submit report</button>
+              </form>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if can_moderate and c.id in counter_next_statuses %}
+            {% with next_statuses=counter_next_statuses|get_item:c.id %}
+              {% if next_statuses %}
+              <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_set_status' pk=c.pk %}">
+                {% csrf_token %}
+                <label class="label" for="counter-status-{{ c.pk }}">Counter status</label>
+                <select class="select" id="counter-status-{{ c.pk }}" name="status">
+                  {% for value, label in status_choices %}
+                    {% if value in next_statuses %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+                <button class="button" type="submit">Apply</button>
+              </form>
+              {% endif %}
+            {% endwith %}
+            {% endif %}
+            {% if can_moderate %}
+            {% if c.deleted_at %}
+            <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_restore' pk=c.pk %}">
+              {% csrf_token %}
+              <button class="button" type="submit">Restore counter</button>
+            </form>
+            {% else %}
+            <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_delete' pk=c.pk %}">
+              {% csrf_token %}
+              <button class="button" type="submit">Delete counter</button>
+            </form>
+            {% endif %}
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="muted">No counters yet.</div>
+        {% endif %} {% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+</article>
+{% endblock %}

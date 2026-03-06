@@ -1,0 +1,70 @@
+{% extends "thinking/base.html" %}
+{% load thinking_extras %}
+
+{% block title %}Theses · glitter.im{% endblock %}
+{% block meta_description %}Browse active, new, and unanswered theses on glitter.im.{% endblock %}
+
+{% block content %}
+<div class="page_head">
+  <h1 class="h1">Theses</h1>
+  {% if user.is_authenticated %}
+  <a class="button" href="{% url "thinking:thesis_create" %}">Submit</a>
+  {% endif %}
+</div>
+
+<div class="tabs">
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort=active{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}">Active</a>
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort=new{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}">New</a>
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort=unanswered{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}">Unanswered</a>
+  {% if include_inactive %}
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort={{ request.GET.sort|default:'active' }}{% if include_deleted %}&include_deleted=1{% endif %}">Hide Inactive</a>
+  {% elif user.is_authenticated %}
+  {% has_site_role "moderator" "operator" as can_moderate %}
+  {% if can_moderate %}
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort={{ request.GET.sort|default:'active' }}&include_inactive=1{% if include_deleted %}&include_deleted=1{% endif %}">Include Inactive</a>
+  {% endif %}
+  {% endif %}
+  {% if include_deleted %}
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort={{ request.GET.sort|default:'active' }}{% if include_inactive %}&include_inactive=1{% endif %}">Hide Deleted</a>
+  {% elif user.is_authenticated %}
+  {% has_site_role "moderator" "operator" as can_moderate %}
+  {% if can_moderate %}
+  <a class="tab" href="{% url "thinking:thesis_list" %}?sort={{ request.GET.sort|default:'active' }}{% if include_inactive %}&include_inactive=1{% endif %}&include_deleted=1">Include Deleted</a>
+  {% endif %}
+  {% endif %}
+</div>
+
+<ul class="list">
+  {% for t in theses %}
+  <li class="list_item">
+    <a class="title_link" href="{% url "thinking:thesis_detail" pk=t.pk %}">{{ t.title }}</a>
+    <div class="meta">
+      {{ t.author.username }} · counters {{ t.counter_count }} · {{ t.created_at|date:"Y-m-d" }} · {{ t.status|title }}
+    </div>
+    {% if t.deleted_at %}
+    <div class="status_row">
+      <span class="badge status_badge status_deleted">Deleted</span>
+    </div>
+    {% endif %}
+  </li>
+  {% empty %}
+  <li class="muted">No theses.</li>
+  {% endfor %}
+</ul>
+
+{% if is_paginated %}
+<div class="pager">
+  {% with sort=request.GET.sort|default:"active" %}
+    {% if page_obj.has_previous %}
+      <a class="small_link" href="?sort={{ sort }}{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}&page={{ page_obj.previous_page_number }}">Prev</a>
+    {% endif %}
+
+    <span class="meta">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+      <a class="small_link" href="?sort={{ sort }}{% if include_inactive %}&include_inactive=1{% endif %}{% if include_deleted %}&include_deleted=1{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  {% endwith %}
+</div>
+{% endif %}
+{% endblock %}

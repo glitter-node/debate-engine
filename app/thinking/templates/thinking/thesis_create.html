@@ -1,0 +1,49 @@
+{% extends "thinking/base.html" %}
+{% block title %}Submit · glitter.im{% endblock %}
+{% block meta_description %}Submit a new thesis and supporting arguments on glitter.im.{% endblock %}
+{% block content %}
+<h1 class="h1">Submit Thesis</h1>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  <div class="form_block">
+    <label class="label">Title</label>
+    {{ form.title }}
+  </div>
+
+  <div class="form_block">
+    <label class="label">Summary</label>
+    {{ form.summary }}
+  </div>
+
+  <div class="form_block">
+    <label class="label">Stance</label>
+    {{ form.stance }}
+  </div>
+
+  <div class="form_block">
+    <div class="h2">Arguments</div>
+    {{ argument_formset.management_form }}
+    <div class="stack">
+      {% for f in argument_formset.forms %}
+      <div class="box">
+        <div class="row">
+          <div class="col">
+            <label class="label">Order</label>
+            {{ f.order }}
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label class="label">Body</label>
+            {{ f.body }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <button class="button" type="submit">Create</button>
+</form>
+{% endblock %}

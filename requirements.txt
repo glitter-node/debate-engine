@@ -1,0 +1,10 @@
+Django==5.2.11
+django-cors-headers==4.9.0
+black==26.1.0
+google-auth==2.41.1
+gunicorn==25.1.0
+PyMySQL==1.1.2
+pytz==2025.2
+pylint==4.0.5
+requests>=2.31
+whitenoise==6.11.0

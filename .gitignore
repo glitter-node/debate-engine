@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Django runtime artifacts
+app/staticfiles/
+staticfiles/
+media/
+
+# Environment and secrets
+.env
+.env.*
+data/config/env/**/.env
+!data/config/env/**/.env.example
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Temp
+.tmp/

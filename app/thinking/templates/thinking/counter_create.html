@@ -1,0 +1,22 @@
+{% extends "thinking/base.html" %} 
+{% block title %}Add Counter · glitter.im{% endblock %} 
+{% block meta_description %}Post a counter-argument to strengthen the discussion on glitter.im.{% endblock %}
+{% block content %}
+<h1 class="h1">Add Counter</h1>
+<div class="meta">{{ thesis.title }}</div>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  <div class="form_block">
+    <label class="label">Target argument</label>
+    {{ form.target_argument }}
+  </div>
+
+  <div class="form_block">
+    <label class="label">Counter</label>
+    {{ form.body }}
+  </div>
+
+  <button class="button" type="submit">Post</button>
+</form>
+{% endblock %}

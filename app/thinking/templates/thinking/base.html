@@ -1,0 +1,55 @@
+{% load static thinking_extras %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}glitter.im{% endblock %}</title>
+    <meta
+      name="description"
+      content="{% block meta_description %}glitter.im is a structured discussion space for theses, arguments, and counters.{% endblock %}"
+    />
+    <link
+      rel="icon"
+      href="{{ fav_url|default:'/favicon.ico' }}"
+      type="image/x-icon"
+    />
+    <link rel="stylesheet" href="{% static 'thinking/app.css' %}" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header_row">
+        <a class="brand" href="{% url 'thinking:home' %}">glitter.im</a>
+        <nav class="nav">
+          <a class="nav_link" href="{% url 'thinking:thesis_list' %}">Theses</a>
+          {% if user.is_authenticated %}
+          {% has_site_role "moderator" "operator" as can_moderate %}
+          <a class="nav_link" href="{% url 'thinking:thesis_create' %}"
+            >Submit</a
+          >
+          {% if can_moderate %}
+          <a class="nav_link" href="{% url 'thinking:moderation_panel' %}">Moderation</a>
+          {% endif %}
+          {% if user.is_staff or user.is_superuser %}
+          <a class="nav_link" href="{% url 'admin:index' %}">Admin</a>
+          {% endif %}
+          <form class="nav_form" method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="nav_link nav_button" type="submit">Logout</button>
+          </form>
+          {% else %}
+          <a class="nav_link" href="{% url 'authflow:home' %}">Sign in</a>
+          <a class="nav_link" href="{% url 'authflow:home' %}">Request access</a>
+          {% endif %}
+          <a class="nav_link" href="/api/">API</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="container">{% block content %}{% endblock %}</div>
+    </main>
+    {% block extra_scripts %}{% endblock %}
+  </body>
+</html>

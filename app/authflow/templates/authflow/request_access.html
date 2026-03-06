@@ -1,0 +1,49 @@
+{% extends "thinking/base.html" %}
+{% load static %}
+
+{% block title %}Request Access · glitter.im{% endblock %}
+{% block meta_description %}Request a verification link to sign in to glitter.im.{% endblock %}
+{% block extra_head %}
+{% if google_client_id %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1 class="h1">Request Access</h1>
+  <p class="lead">Use Google One Tap to sign in, or request an email link.</p>
+
+  <div
+    id="google-onetap-config"
+    data-client-id="{{ google_client_id }}"
+    data-endpoint="{% url 'authflow:google_onetap' %}"
+    data-next="{{ next_path }}"
+  ></div>
+  <p id="auth-account-linking-note">Google sign-in reuses an existing account when the verified email already exists.</p>
+<p id="google-onetap-status" class="meta"></p>
+
+  {% if notice %}
+  <p class="meta">{{ notice }}</p>
+  {% endif %}
+
+  {% if invalid %}
+  <p class="meta">This link is invalid or expired. Request a new one below.</p>
+  {% endif %}
+
+  <p class="meta">Fallback: email sign-in link.</p>
+  <form method="post" action="{% url 'authflow:request' %}" class="form">
+    {% csrf_token %}
+    <div class="form_block">
+      <label class="label" for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+    </div>
+    <button class="button" type="submit">Send Link</button>
+  </form>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+{% if google_client_id %}
+<script src="{% static 'authflow/one_tap.js' %}" defer></script>
+{% endif %}
+{% endblock %}

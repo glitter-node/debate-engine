@@ -1,0 +1,297 @@
+{% extends "thinking/base.html" %}
+{% block title %}Moderation · glitter.im{% endblock %}
+{% block meta_description %}Moderator controls for glitter.im.{% endblock %}
+{% block content %}
+<section class="card">
+  <h1 class="h1">Moderation Panel</h1>
+  <p class="lead">Role-based site moderation access is enabled.</p>
+  <div class="row">
+    <a class="small_link" href="{% url 'thinking:moderation_panel' %}?tab=reports">Reports</a>
+    <a class="small_link" href="{% url 'thinking:moderation_panel' %}?tab=metrics&since_days={{ since_days }}">Metrics</a>
+  </div>
+  <form method="post" action="{% url 'thinking:moderation_mark_reviewed' %}">
+    {% csrf_token %}
+    <button type="submit" class="button">Record moderation check</button>
+  </form>
+</section>
+
+{% if active_tab == "metrics" %}
+<section class="card">
+  <h2 class="h2">Moderator Decision Metrics</h2>
+  <div class="row">
+    <a class="small_link" href="{% url 'thinking:moderation_metrics_csv' %}?since_days={{ since_days }}{% if operator_filter %}&amp;operator={{ operator_filter|urlencode }}{% endif %}">Download CSV</a>
+  </div>
+  <form method="get" class="form stack">
+    <input type="hidden" name="tab" value="metrics">
+    <div class="row">
+      <div class="col">
+        <label class="label" for="metrics_since_days">Time Window</label>
+        <select id="metrics_since_days" name="since_days" class="select">
+          {% for option in since_days_options %}
+          <option value="{{ option }}"{% if since_days == option %} selected{% endif %}>Last {{ option }} days</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label class="label" for="metrics_operator">Operator</label>
+        <input id="metrics_operator" name="operator" class="input" value="{{ operator_filter|default:'' }}" placeholder="username">
+      </div>
+      <div class="col">
+        <button type="submit" class="button">Apply window</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="row">
+    <div class="col">
+      <div class="meta">Open</div>
+      <div class="h2">{{ metrics.counts_by_status.open_count }}</div>
+    </div>
+    <div class="col">
+      <div class="meta">Resolved</div>
+      <div class="h2">{{ metrics.counts_by_status.resolved_count }}</div>
+    </div>
+    <div class="col">
+      <div class="meta">Dismissed</div>
+      <div class="h2">{{ metrics.counts_by_status.dismissed_count }}</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <div class="meta">Median decision latency</div>
+      <div>{{ metrics.latency.median_label }} ({{ metrics.latency.median_seconds|default:"n/a" }}s)</div>
+    </div>
+    <div class="col">
+      <div class="meta">P90 decision latency</div>
+      <div>{{ metrics.latency.p90_label }} ({{ metrics.latency.p90_seconds|default:"n/a" }}s)</div>
+    </div>
+    <div class="col">
+      <div class="meta">Decision samples</div>
+      <div>{{ metrics.latency.sample_size }}{% if metrics.latency.sampled %} (capped){% endif %}</div>
+    </div>
+  </div>
+
+  <h3 class="h3">Decisions Per Operator</h3>
+  <ul class="list">
+    {% for row in metrics.operator_decisions %}
+    <li class="list_item">
+      <span class="meta">{{ row.operator_username }}</span> · {{ row.decision_count }}
+    </li>
+    {% empty %}
+    <li class="muted">No decisions in this window.</li>
+    {% endfor %}
+  </ul>
+  <h3 class="h3">Operator Workload (window: {{ since_days }} days)</h3>
+  {% if metrics.operator_not_found %}
+  <div class="meta">No decisions found for operator in window.</div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr>
+        <th>Operator</th>
+        <th>Decisions</th>
+        <th>Resolved</th>
+        <th>Dismissed</th>
+        <th>Median latency</th>
+        <th>P90 latency</th>
+        <th>Samples</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in metrics.operator_metrics %}
+      <tr>
+        <td>{{ row.operator_username }}</td>
+        <td>{{ row.decisions_count }}</td>
+        <td>{{ row.resolved_count }}</td>
+        <td>{{ row.dismissed_count }}</td>
+        <td>{{ row.median_label }} ({{ row.median_seconds|default:"n/a" }}s)</td>
+        <td>{{ row.p90_label }} ({{ row.p90_seconds|default:"n/a" }}s)</td>
+        <td>{{ row.sample_count }}{% if row.sampled_flag %} (capped){% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="muted">No operator workload in this window.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 class="h3">Auto-Moderation Pressure</h3>
+  <div class="meta">
+    Hot targets (open_count &gt;= {{ metrics.auto_review_threshold }}): {{ metrics.hot_targets_count }}
+  </div>
+  <div class="meta">
+    Open reports on hot targets: {{ metrics.hot_reports_total }}
+  </div>
+  <h3 class="h3">Stale OPEN SLA</h3>
+  <div class="meta">
+    Stale OPEN (&gt;{{ metrics.stale_threshold_hours }}h): {{ metrics.stale_open_count }}
+  </div>
+  <div class="meta">
+    Oldest stale age: {% if metrics.oldest_stale_open_age_seconds is not None %}{{ metrics.oldest_stale_open_age_seconds }}s{% else %}n/a{% endif %}
+  </div>
+  <h3 class="h3">Escalation Distribution</h3>
+  <div class="meta">
+    Level 1 targets: {{ metrics.escalation_distribution.level_1_targets }}
+  </div>
+  <div class="meta">
+    Level 2 targets: {{ metrics.escalation_distribution.level_2_targets }}
+  </div>
+  <div class="meta">
+    Level 3 targets: {{ metrics.escalation_distribution.level_3_targets }}
+  </div>
+  <div class="meta">
+    Highest escalation level active: {{ metrics.max_escalation_level }}
+  </div>
+</section>
+{% else %}
+<section class="card">
+  <h2 class="h2">Reports ({{ open_reports_count }})</h2>
+  {% if priority_mode %}
+  <div class="meta">Priority mode active (Escalation, stale, oldest first).</div>
+  {% endif %}
+  {% if priority_candidates_capped %}
+  <div class="meta">Priority mode capped to oldest {{ priority_candidates_cap }} filtered reports.</div>
+  {% endif %}
+  <form id="bulk-action-form" method="post" action="{% url 'thinking:moderation_reports_bulk' %}" class="form stack">
+    {% csrf_token %}
+    <input type="hidden" name="next_query" value="{{ full_query_string }}">
+    <div class="row">
+      <div class="col">
+        <label class="label" for="bulk_action">Bulk Action</label>
+        <select id="bulk_action" name="action" class="select">
+          <option value="resolve">Resolve selected</option>
+          <option value="dismiss">Dismiss selected</option>
+        </select>
+      </div>
+      <div class="col">
+        <button type="submit" class="button">Apply to selected</button>
+      </div>
+    </div>
+  </form>
+  <form method="get" class="form stack">
+    <input type="hidden" name="tab" value="reports">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <div class="row">
+      <div class="col">
+        <label class="label" for="moderation_sort">Sort</label>
+        <select id="moderation_sort" name="sort" class="select">
+          <option value="">Default</option>
+          <option value="priority"{% if sort_filter == "priority" %} selected{% endif %}>Priority (Escalation + Stale)</option>
+        </select>
+      </div>
+      <div class="col">
+        <label class="label" for="moderation_target_type">Target Type</label>
+        <select id="moderation_target_type" name="target_type" class="select">
+          <option value="">All targets</option>
+          <option value="thesis"{% if target_type_filter == "thesis" %} selected{% endif %}>Thesis</option>
+          <option value="counter"{% if target_type_filter == "counter" %} selected{% endif %}>Counter</option>
+        </select>
+      </div>
+      <div class="col">
+        <label class="label" for="moderation_reason">Reason</label>
+        <select id="moderation_reason" name="reason" class="select">
+          <option value="">All reasons</option>
+          {% for item in reason_choices %}
+          <option value="{{ item }}"{% if reason_filter == item %} selected{% endif %}>{{ item|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label class="label" for="moderation_escalation_level">Escalation Level</label>
+        <select id="moderation_escalation_level" name="escalation_level" class="select">
+          <option value="">All levels</option>
+          <option value="1"{% if escalation_level_filter == 1 %} selected{% endif %}>&gt;= Level 1</option>
+          <option value="2"{% if escalation_level_filter == 2 %} selected{% endif %}>&gt;= Level 2</option>
+          <option value="3"{% if escalation_level_filter == 3 %} selected{% endif %}>&gt;= Level 3</option>
+        </select>
+      </div>
+    </div>
+    <label class="meta">
+      <input type="checkbox" name="only_auto" value="1"{% if only_auto_filter %} checked{% endif %}>
+      Only auto-moderated targets
+    </label>
+    <label class="meta">
+      <input type="checkbox" name="stale_only" value="1"{% if stale_only_filter %} checked{% endif %}>
+      Only stale OPEN (&gt;{{ stale_threshold_hours }}h)
+    </label>
+    <div class="row">
+      <button type="submit" class="button">Apply filters</button>
+    </div>
+  </form>
+  <ul class="list">
+    {% for row in open_reports %}
+    {% with report=row.report %}
+    <li class="list_item">
+      <div class="meta">
+        <label>
+          <input type="checkbox" name="report_ids" value="{{ report.id }}" form="bulk-action-form">
+          Select
+        </label>
+        ·
+        {{ report.target_type|title }} ·
+        {% if row.target_url %}
+        <a class="small_link" href="{{ row.target_url }}">{{ row.target_label }}</a>
+        {% else %}
+        {{ row.target_label }}
+        {% endif %}
+        · open {{ row.open_count_for_target }}
+        {% if row.escalation_level >= 1 %}
+        <span class="badge status_badge status_escalation_l{{ row.escalation_level }}">ESC L{{ row.escalation_level }}</span>
+        {% endif %}
+        {% if row.is_auto_moderated %}
+        <span class="badge status_badge status_pending_review">Auto-threshold</span>
+        {% endif %}
+        {% if row.is_stale %}
+        <span class="badge status_badge status_stale">STALE</span>
+        {% endif %}
+        {% if row.target_status %}
+        <span class="badge status_badge status_{{ row.target_status }}">{{ row.target_status|title }}</span>
+        {% endif %}
+        {% if row.target_deleted %}
+        <span class="badge status_badge status_deleted">Deleted</span>
+        {% endif %}
+      </div>
+      <div class="meta">
+        reason {{ report.reason|title }} ·
+        reporter {% if report.reporter %}{{ report.reporter.username }}{% else %}anonymous{% endif %} ·
+        {{ report.created_at|date:"Y-m-d H:i" }}
+      </div>
+      {% if report.detail %}
+      <div class="prose">{{ report.detail|linebreaksbr }}</div>
+      {% endif %}
+      {% if report.status == "open" %}
+      <div class="row moderation_form">
+        <form method="post" action="{% url 'thinking:moderation_report_resolve' pk=report.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="button">Resolve</button>
+        </form>
+        <form method="post" action="{% url 'thinking:moderation_report_dismiss' pk=report.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="button">Dismiss</button>
+        </form>
+      </div>
+      {% endif %}
+    </li>
+    {% endwith %}
+    {% empty %}
+    <li class="muted">No open reports.</li>
+    {% endfor %}
+  </ul>
+  {% if page_obj and page_obj.has_other_pages %}
+  <div class="pagination">
+    <span class="muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div class="row">
+      {% if page_obj.has_previous %}
+      <a class="small_link" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a class="small_link" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
