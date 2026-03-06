@@ -1,24 +1,23 @@
-```markdown
-A prototype exploring debate-domain modeling for structured discussion systems.
+# Glitter
 
-# Glitter — Debate Domain Prototype
+**Debate Domain Prototype for Structured Discussion Systems**
 
 https://glitter.im
 
-A prototype exploring **debate-domain modeling for structured discussion systems**.
+A prototype exploring **debate-domain modeling** for structured discussion systems.
 
-Glitter experiments with representing discussions as structured debate entities rather than flat comment threads.
+Instead of representing discussions as flat comment threads, this project models debates as **explicit domain entities with moderation and policy logic built into the model**.
 
 This repository is **not intended to be a finished discussion platform**.  
 It is primarily a **domain modeling experiment** around structured debate systems.
 
 ---
 
-# Motivation
+## Why This Exists
 
-Most online discussions are implemented as simple comment threads.
+Most discussion platforms implement conversations as simple comment trees.
 
-However many real discussions have implicit structure:
+However real discussions usually have structure:
 
 - a central claim
 - supporting arguments
@@ -27,94 +26,106 @@ However many real discussions have implicit structure:
 - reporting and review
 - audit trails
 
-These elements usually exist in community platforms but are rarely modeled explicitly in the domain.
+These structures exist implicitly but are rarely modeled explicitly.
 
-This project explores whether discussion systems could benefit from a **structured debate model**.
+Glitter explores what happens when **discussion systems treat debate structure as a first-class domain model**.
 
 ---
 
-# Core Domain Model
+## Core Domain Model
 
-The current prototype models discussions using several primary entities.
+The prototype models discussions using several primary entities.
 
 
 Thesis
-Argument
-Counter
-ContentReport
-UserRole
-AuditLog
+├─ Argument
+│ └─ Counter
+├─ Argument
+│ └─ Counter
 
 
-### Thesis
+### Entities
 
-A central claim or topic under discussion.
+| Entity | Description |
+|------|-------------|
+| **Thesis** | A central claim or topic under discussion |
+| **Argument** | Supporting reasoning attached to a thesis |
+| **Counter** | Counterarguments targeting specific arguments |
+| **ContentReport** | Moderation workflow for problematic content |
+| **UserRole** | Role system for moderators and operators |
+| **AuditLog** | Audit trail for moderation and system events |
 
-### Argument
-
-Supporting reasoning attached to a thesis.
-
-### Counter
-
-Counterarguments that target specific arguments.
-
-### ContentReport
-
-A moderation workflow for reporting problematic content.
-
-### UserRole
-
-Role system supporting moderators and operators.
-
-### AuditLog
-
-Audit trail for moderation actions and system events.
-
-The goal is to represent debate as a structured system rather than a flat comment tree.
+The goal is to represent **debate structure rather than a flat comment tree**.
 
 ---
 
-# Architecture
+## Architecture
 
-The codebase is organized to gradually evolve toward a reusable debate-domain module.
+The project is gradually evolving toward a reusable debate-domain module.
 
 
-Domain Layer
-models.py
+thinking/
+
+├─ models.py
+│ Domain entities
+│
+├─ services/
+│ Domain write orchestration
+│ ├─ reporting.py
+│ └─ moderation.py
+│
+├─ queries/
+│ Reusable read models
+│ ├─ thesis_detail.py
+│ ├─ moderation.py
+│ └─ reporting.py
+│
+├─ policies.py
+│ Shared domain policy
+│ - moderation roles
+│ - visibility rules
+│ - status transitions
+│
+└─ interfaces
+├─ views.py
+└─ api/views.py
+
+
+### Design Goals
+
+- **Domain-driven discussion model**
+- **Reusable debate-domain module**
+- **Service / Query separation**
+- **Shared policy layer**
+- **SSR and API reuse of the same read models**
+
+---
+
+## Example Debate Structure
+
+Traditional forum:
+
+
+Post
+└─ Comment
+└─ Reply
+
+
+Structured debate model:
+
+
 Thesis
-Argument
-Counter
-ContentReport
-UserRole
-AuditLog
-
-Service Layer
-services/
-reporting.py
-moderation.py
-
-Query Layer
-queries/
-thesis_detail.py
-moderation.py
-reporting.py
-
-Policy Layer
-policies.py
-moderation roles
-visibility rules
-status transitions
-
-Interface Layer
-views.py
-api/views.py
+├─ Argument
+│ └─ Counter
+├─ Argument
+│ └─ Counter
 
 
-One design goal is ensuring that **SSR pages and API endpoints reuse the same query layer**.
+This structure allows clearer reasoning chains and moderation workflows.
 
 ---
 
-# Current Features
+## Current Features
 
 The prototype currently demonstrates:
 
@@ -133,58 +144,38 @@ The system supports both:
 - server-rendered pages
 - JSON API endpoints
 
-using the same internal read models.
-
 ---
 
-# Example Debate Structure
+## Development
 
-Instead of a comment tree:
-
-
-Post
-└─ Comment
-└─ Reply
-
-
-This project models discussions more like:
-
-
-Thesis
-├─ Argument
-│ └─ Counter
-├─ Argument
-│ └─ Counter
-
-
-This allows clearer reasoning structures and moderation workflows.
-
----
-
-# Development
-
-The project uses Django with MariaDB/MySQL by default.
+The project uses **Django with MariaDB/MySQL by default**.
 
 Typical development commands:
 
 ```bash
 ./run_manage.sh check
+
 APP_ENV=test ./run_manage.sh test
+
 make test
 make lint
 make ci
 
-The test suite includes integration tests and direct policy-layer tests.
+The test suite includes:
+
+integration tests
+
+policy-layer tests
 
 Project Status
 
-This is an early prototype.
+This repository is an early prototype.
 
-The repository mainly demonstrates:
+It demonstrates:
 
 debate domain modeling
 
-moderation / report workflows
+moderation/report workflows
 
 architecture separation (service / query / policy)
 
@@ -192,7 +183,7 @@ It does not aim to be a production-ready platform.
 
 Intended Direction
 
-The long-term direction is exploring whether the debate model could become a reusable component for systems such as:
+The longer-term direction is exploring whether the debate model could become a reusable component for systems such as:
 
 AI-assisted discussion platforms
 
@@ -214,7 +205,7 @@ debate domain modeling
 
 moderation/report architecture
 
-query/service separation
+service/query separation
 
 policy-layer design
 
@@ -225,9 +216,9 @@ Project
 Website
 https://glitter.im
 
-Source code
-[(GitHub repository)](https://github.com/glitter-node/structured-debate)
+Repository
+https://github.com/glitter-node/structured-debate
 
 License
+
 TBD
-(To be determined)
