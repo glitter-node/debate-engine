@@ -1,6 +1,6 @@
 # Glitter.im
 
-**Debate Domain Prototype for Structured Discussion Systems**
+**Debate Domain Prototype for Structured Debate Engine**
 
 Project site: https://glitter.im
 
