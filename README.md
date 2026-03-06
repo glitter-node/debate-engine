@@ -1,42 +1,43 @@
+```markdown
 A prototype exploring debate-domain modeling for structured discussion systems.
 
-Glitter – Debate Domain Prototype
+# Glitter — Debate Domain Prototype
 
 https://glitter.im
 
-Glitter is a prototype exploring how structured debate systems can be modeled as a reusable domain layer.
+A prototype exploring **debate-domain modeling for structured discussion systems**.
 
-Instead of treating discussion platforms as comment trees, this project experiments with representing debates as explicit domain entities with moderation and policy logic built into the model.
+Glitter experiments with representing discussions as structured debate entities rather than flat comment threads.
 
-This repository is not intended to be a finished discussion platform.
-It is primarily a domain modeling experiment around structured discussion systems.
+This repository is **not intended to be a finished discussion platform**.  
+It is primarily a **domain modeling experiment** around structured debate systems.
 
-Motivation
+---
 
-Most online discussions today are implemented as simple comment threads.
+# Motivation
 
-However, many real discussions have implicit structure:
+Most online discussions are implemented as simple comment threads.
 
-a central claim
+However many real discussions have implicit structure:
 
-supporting arguments
-
-counter arguments
-
-moderation workflows
-
-reporting and review
-
-audit trails
+- a central claim
+- supporting arguments
+- counter arguments
+- moderation workflows
+- reporting and review
+- audit trails
 
 These elements usually exist in community platforms but are rarely modeled explicitly in the domain.
 
-This project explores whether discussion systems could benefit from a structured debate model.
+This project explores whether discussion systems could benefit from a **structured debate model**.
 
-Core Domain Model
+---
+
+# Core Domain Model
 
 The current prototype models discussions using several primary entities.
 
+
 Thesis
 Argument
 Counter
@@ -44,122 +45,129 @@ ContentReport
 UserRole
 AuditLog
 
-Thesis
+
+### Thesis
 
 A central claim or topic under discussion.
 
-Argument
+### Argument
 
 Supporting reasoning attached to a thesis.
 
-Counter
+### Counter
 
 Counterarguments that target specific arguments.
 
-ContentReport
+### ContentReport
 
 A moderation workflow for reporting problematic content.
 
-UserRole
+### UserRole
 
 Role system supporting moderators and operators.
 
-AuditLog
+### AuditLog
 
 Audit trail for moderation actions and system events.
 
 The goal is to represent debate as a structured system rather than a flat comment tree.
 
-Architecture
+---
+
+# Architecture
 
 The codebase is organized to gradually evolve toward a reusable debate-domain module.
 
+
 Domain Layer
-    models.py
-        Thesis
-        Argument
-        Counter
-        ContentReport
-        UserRole
-        AuditLog
+models.py
+Thesis
+Argument
+Counter
+ContentReport
+UserRole
+AuditLog
 
 Service Layer
-    services/
-        reporting.py
-        moderation.py
+services/
+reporting.py
+moderation.py
 
 Query Layer
-    queries/
-        thesis_detail.py
-        moderation.py
-        reporting.py
+queries/
+thesis_detail.py
+moderation.py
+reporting.py
 
 Policy Layer
-    policies.py
-        moderation roles
-        visibility rules
-        status transitions
+policies.py
+moderation roles
+visibility rules
+status transitions
 
 Interface Layer
-    views.py
-    api/views.py
+views.py
+api/views.py
 
-One design goal is ensuring that SSR pages and API endpoints reuse the same query layer.
 
-Current Features
+One design goal is ensuring that **SSR pages and API endpoints reuse the same query layer**.
+
+---
+
+# Current Features
 
 The prototype currently demonstrates:
 
-structured debate entities
-
-argument / counterargument relationships
-
-moderation workflows
-
-reporting system
-
-audit logging
-
-role-based moderation
-
-service/query separation
-
-shared policy layer
-
-SSR + API reuse of read models
+- structured debate entities
+- argument / counterargument relationships
+- moderation workflows
+- reporting system
+- audit logging
+- role-based moderation
+- service / query separation
+- shared policy layer
+- SSR + API reuse of read models
 
 The system supports both:
 
-server-rendered pages
-
-JSON API endpoints
+- server-rendered pages
+- JSON API endpoints
 
 using the same internal read models.
 
-Example Debate Structure
+---
+
+# Example Debate Structure
 
 Instead of a comment tree:
 
+
 Post
- └─ Comment
-     └─ Reply
+└─ Comment
+└─ Reply
+
 
 This project models discussions more like:
 
+
 Thesis
- ├─ Argument
- │   └─ Counter
- ├─ Argument
- │   └─ Counter
+├─ Argument
+│ └─ Counter
+├─ Argument
+│ └─ Counter
+
 
 This allows clearer reasoning structures and moderation workflows.
 
-Development
+---
+
+# Development
 
 The project uses Django with MariaDB/MySQL by default.
 
 Typical development commands:
 
+```bash
 ./run_manage.sh check
 APP_ENV=test ./run_manage.sh test
 make test
@@ -176,11 +184,11 @@ The repository mainly demonstrates:
 
 debate domain modeling
 
-moderation/report workflows
+moderation / report workflows
 
-architecture separation (service/query/policy)
+architecture separation (service / query / policy)
 
-It does not yet aim to be a production-ready platform.
+It does not aim to be a production-ready platform.
 
 Intended Direction
 
@@ -212,10 +220,6 @@ policy-layer design
 
 possible real-world use cases
 
-License
-
-(To be determined)
-
 Project
 
 Website
@@ -223,3 +227,7 @@ https://glitter.im
 
 Source code
 (GitHub repository)
+
+License
+
+(To be determined)
