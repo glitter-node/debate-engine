@@ -44,6 +44,7 @@ Thesis
 │ └─ Counter
 
 
+
 ### Entities
 
 | Entity | Description |
@@ -62,6 +63,7 @@ The goal is to represent **debate structure rather than a flat comment tree**.
 ## Architecture
 
 The project is gradually evolving toward a reusable debate-domain module.
+
 
 
 thinking/
