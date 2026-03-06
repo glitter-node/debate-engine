@@ -1,71 +1,41 @@
-# Glitter — Debate Domain Prototype
+A prototype exploring debate-domain modeling for structured discussion systems.
 
-Architecture Prototype — Debate Domain Modeling Experiment
-
-⚠️ Experimental Prototype — Domain Architecture Exploration
+Glitter – Debate Domain Prototype
 
 https://glitter.im
 
-Glitter is an experimental **debate-domain prototype** exploring how structured discussion systems can be modeled as a reusable domain module.
+Glitter is a prototype exploring how structured debate systems can be modeled as a reusable domain layer.
 
-This project is **not a finished discussion platform**.  
-Instead, it focuses on the **domain architecture of structured debates**: claims, arguments, counterarguments, moderation workflows, and policy rules.
+Instead of treating discussion platforms as comment trees, this project experiments with representing debates as explicit domain entities with moderation and policy logic built into the model.
 
-The goal is to explore whether discussion systems can have a **reusable debate-domain layer** similar to how other systems share domain models (for example carts in ecommerce).
+This repository is not intended to be a finished discussion platform.
+It is primarily a domain modeling experiment around structured discussion systems.
 
----
+Motivation
 
-# Motivation
+Most online discussions today are implemented as simple comment threads.
 
-Most online discussion systems are implemented as simple comment trees.
+However, many real discussions have implicit structure:
 
-However, real debates often have a more explicit structure:
+a central claim
 
-- a thesis or claim
-- supporting arguments
-- counterarguments
-- moderation workflows
-- reporting systems
-- audit logs
+supporting arguments
 
-These elements usually exist implicitly in community platforms but are rarely modeled as **first-class domain entities**.
+counter arguments
 
-This project experiments with treating structured debate as a domain model rather than just a UI pattern.
+moderation workflows
 
----
+reporting and review
 
-# Core Domain Model
+audit trails
 
-The prototype models debate discussions with the following entities.
+These elements usually exist in community platforms but are rarely modeled explicitly in the domain.
 
-## Thesis
-The main claim or topic being discussed.
+This project explores whether discussion systems could benefit from a structured debate model.
 
-## Argument
-Supporting reasoning that strengthens the thesis.
+Core Domain Model
 
-## Counter
-A counterargument attached to a specific argument.
-
-## ContentReport
-Reporting workflow used for moderation.
-
-## UserRole
-Role-based moderation and operational permissions.
-
-## AuditLog
-Event log for moderation and system actions.
-
-The resulting structure resembles a small **discussion graph**, not a flat comment tree.
-
----
-
-# Architecture
-
-The codebase is organized around layered responsibilities.
-
-## Domain Models
-
+The current prototype models discussions using several primary entities.
 
 Thesis
 Argument
@@ -74,180 +44,182 @@ ContentReport
 UserRole
 AuditLog
 
+Thesis
 
-## Service Layer
+A central claim or topic under discussion.
 
-Domain write operations:
+Argument
 
-- report submission
-- moderation actions
-- status transitions
+Supporting reasoning attached to a thesis.
 
-## Query Layer
+Counter
 
-Reusable read models:
+Counterarguments that target specific arguments.
 
-- thesis detail assembly
-- moderation report views
+ContentReport
 
-## Policy Layer
+A moderation workflow for reporting problematic content.
 
-Shared non-UI policy logic:
+UserRole
 
-- moderation roles
-- visibility rules
-- status transitions
+Role system supporting moderators and operators.
 
-## Interface Layer
+AuditLog
 
-- server-rendered pages (Django templates)
-- JSON API endpoints
+Audit trail for moderation actions and system events.
 
-One design goal was ensuring that **SSR pages and API endpoints reuse the same query layer**.
+The goal is to represent debate as a structured system rather than a flat comment tree.
 
----
+Architecture
 
-# Current Features
+The codebase is organized to gradually evolve toward a reusable debate-domain module.
 
-The prototype currently includes:
+Domain Layer
+    models.py
+        Thesis
+        Argument
+        Counter
+        ContentReport
+        UserRole
+        AuditLog
 
-- structured debate entities
-- argument and counterargument relationships
-- moderation and reporting workflows
-- audit logging
-- role-based moderation
-- query/service separation
-- shared policy layer
-- SSR + API reuse of read models
+Service Layer
+    services/
+        reporting.py
+        moderation.py
 
-This repository represents an early **architecture prototype** rather than a finished product.
+Query Layer
+    queries/
+        thesis_detail.py
+        moderation.py
+        reporting.py
 
----
+Policy Layer
+    policies.py
+        moderation roles
+        visibility rules
+        status transitions
 
-# Example Debate Structure
+Interface Layer
+    views.py
+    api/views.py
 
-A typical discussion structure looks like this:
+One design goal is ensuring that SSR pages and API endpoints reuse the same query layer.
 
+Current Features
+
+The prototype currently demonstrates:
+
+structured debate entities
+
+argument / counterargument relationships
+
+moderation workflows
+
+reporting system
+
+audit logging
+
+role-based moderation
+
+service/query separation
+
+shared policy layer
+
+SSR + API reuse of read models
+
+The system supports both:
+
+server-rendered pages
+
+JSON API endpoints
+
+using the same internal read models.
+
+Example Debate Structure
+
+Instead of a comment tree:
+
+Post
+ └─ Comment
+     └─ Reply
+
+This project models discussions more like:
 
 Thesis
-├─ Argument A
-│ ├─ Counter A1
-│ └─ Counter A2
-└─ Argument B
-└─ Counter B1
+ ├─ Argument
+ │   └─ Counter
+ ├─ Argument
+ │   └─ Counter
 
+This allows clearer reasoning structures and moderation workflows.
 
-Moderation flows operate on these entities through reports and status transitions.
+Development
 
----
+The project uses Django with MariaDB/MySQL by default.
 
-# Technology Stack
-
-Core stack:
-
-- Python
-- Django
-- MariaDB / MySQL
-- Gunicorn
-- server-rendered templates
-- small JSON API
-
-The system intentionally avoids heavy frontend frameworks to keep the domain logic clear.
-
----
-
-# Project Structure
-
-
-app/
-thinking/
-models.py # domain entities
-services/ # domain write operations
-queries/ # reusable read models
-policies.py # shared policy layer
-views.py # SSR interface
-templates/
-
-api/
-views.py # JSON endpoints
-
-authflow/
-email login + Google One Tap
-
-
----
-
-# Running the Project
-
-Clone the repository.
-
-
-git clone <repo-url>
-cd glitter
-
-
-Create environment variables.
-
-
-cp .env.example .env
-
-
-Install dependencies.
-
-
-pip install -r requirements.txt
-
-
-Run migrations.
-
-
-./run_manage.sh migrate
-
-
-Start the server.
-
-
-./run_gunicorn.sh
-
-
----
-
-# Development
-
-Run tests.
-
-
-APP_ENV=test ./run_manage.sh test
-
-
-Run checks.
-
+Typical development commands:
 
 ./run_manage.sh check
+APP_ENV=test ./run_manage.sh test
+make test
+make lint
+make ci
 
+The test suite includes integration tests and direct policy-layer tests.
 
-CI script.
+Project Status
 
+This is an early prototype.
 
-scripts/ci.sh
+The repository mainly demonstrates:
 
+debate domain modeling
 
----
+moderation/report workflows
 
-# Feedback
+architecture separation (service/query/policy)
 
-This project is an exploration of **structured debate domain modeling**.
+It does not yet aim to be a production-ready platform.
 
-Feedback is welcome, especially about:
+Intended Direction
 
-- debate domain design
-- moderation workflows
-- service/query separation
-- policy-layer architecture
-- potential real-world use cases
+The long-term direction is exploring whether the debate model could become a reusable component for systems such as:
 
----
+AI-assisted discussion platforms
 
-# License
+knowledge review tools
 
-TBD
+community forums
+
+research discussion environments
+
+decision review systems
+
+Rather than building a single platform, the project experiments with a debate-domain engine that other systems could embed.
+
+Feedback
+
+Feedback is welcome, especially regarding:
+
+debate domain modeling
+
+moderation/report architecture
+
+query/service separation
+
+policy-layer design
+
+possible real-world use cases
+
+License
+
+(To be determined)
+
+Project
+
+Website
+https://glitter.im
+
+Source code
+(GitHub repository)
