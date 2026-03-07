@@ -1,4 +1,4 @@
-# Glitter.im
+# Debate Engine - Glitter.im
 
 **Debate Domain Prototype for Structured Debate Engine**
 
