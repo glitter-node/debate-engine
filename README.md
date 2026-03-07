@@ -4,7 +4,7 @@
 
 Project site: https://glitter.im
 
-This engine is a prototype exploring **debate-domain modeling** for structured discussion systems.
+This engine is **a prototype exploring debate-domain modeling** for structured discussion systems.
 
 Instead of representing discussions as flat comment threads, this project models debates as **explicit domain entities with moderation and policy logic built into the model**.
 
