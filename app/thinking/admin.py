@@ -1,11 +1,14 @@
+# pylint: disable=no-member
 """
 app.thinking.admin - Admin configuration for the "thinking" app.
 """
 
 import json
+from typing import cast
 
-from django.contrib import admin
 from django import forms
+from django.contrib import admin
+from django.forms import ModelChoiceField
 from django.utils.html import escape, format_html
 
 from .models import Argument, AuditLog, Counter, Thesis
@@ -18,11 +21,20 @@ class ArgumentInline(admin.TabularInline):
 
 @admin.register(Argument)
 class ArgumentAdmin(admin.ModelAdmin):
-    list_display = ("id", "thesis", "order", "short_body", "created_at")
-    list_filter = ("thesis", "created_at")
-    search_fields = ("thesis__title", "body")
+    list_display = (
+        "id",
+        "thesis",
+        "order",
+        "author",
+        "status",
+        "short_body",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("thesis", "status", "created_at", "deleted_at")
+    search_fields = ("thesis__title", "body", "author__username")
     ordering = ("thesis__id", "order", "id")
-    list_select_related = ("thesis",)
+    list_select_related = ("thesis", "author")
 
     @admin.display(description="Body")
     def short_body(self, obj):
@@ -53,10 +65,20 @@ class CounterAdmin(admin.ModelAdmin):
     search_fields = ("body", "author__username")
     list_select_related = ("thesis", "target_argument", "author")
 
+    def _target_argument_label(self, obj):
+        thesis_title = "Missing thesis"
+        if obj.thesis_id:
+            try:
+                thesis_title = obj.thesis.title
+            except Thesis.DoesNotExist:
+                thesis_title = f"Missing thesis #{obj.thesis_id}"
+        return f"{thesis_title} · A{obj.order}"
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         field = super().formfield_for_foreignkey(db_field, request, **kwargs)
-        if db_field.name == "target_argument":
-            field.label_from_instance = lambda arg: f"{arg.thesis.title} · A{arg.order}"
+        if db_field.name == "target_argument" and field is not None:
+            model_field = cast(ModelChoiceField, field)
+            model_field.label_from_instance = self._target_argument_label
         return field
 
 
@@ -117,3 +139,4 @@ class AuditLogAdmin(admin.ModelAdmin):
             obj.metadata or {}, indent=2, sort_keys=True, ensure_ascii=False
         )
         return format_html("<pre>{}</pre>", escape(pretty))
+    
