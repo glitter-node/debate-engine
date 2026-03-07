@@ -18,8 +18,8 @@ media/
 # Environment and secrets
 .env
 .env.*
-data/config/env/**/.env
-!data/config/env/**/.env.example
+data/config/_conf_.py
+!.env.example
 
 # Tool caches
 .pytest_cache/
