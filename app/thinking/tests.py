@@ -147,6 +147,27 @@ class CounterCreateLabelTests(TestCase):
         self.assertNotContains(response, f"{self.thesis.pk}:2")
         self.assertNotContains(response, f"{self.thesis.pk}:3")
 
+    def test_counter_create_post_creates_counter_and_redirects(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("thinking:counter_create", kwargs={"pk": self.thesis.pk}),
+            {
+                "target_argument": self.argument_two.pk,
+                "body": "Counter body from test",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            reverse("thinking:thesis_detail", kwargs={"pk": self.thesis.pk}),
+        )
+        created = Counter.objects.get(
+            thesis=self.thesis,
+            target_argument=self.argument_two,
+            author=self.user,
+        )
+        self.assertEqual(created.body, "Counter body from test")
+
 
 class ArgumentAdminUxTests(TestCase):
     def setUp(self):

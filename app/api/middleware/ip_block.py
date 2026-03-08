@@ -107,10 +107,11 @@ class IPBlocker:
             self._stop_event.wait(self.interval)
 
     def start_watcher_once(self) -> None:
-        if self._thread_started:
-            return
-        self._thread_started = True
-        self._stop_event.clear()
+        with self._lock:
+            if self._thread_started:
+                return
+            self._thread_started = True
+            self._stop_event.clear()
         threading.Thread(target=self._watch, daemon=True).start()
 
     def stop_watcher(self) -> None:

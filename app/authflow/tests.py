@@ -12,6 +12,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from authflow.env import get_authflow_settings
+from authflow.mail import _build_ssl_context
 from authflow.models import EmailAuthToken, GoogleAccountLink
 from authflow.google_oauth import GoogleTokenVerificationError
 from authflow.tokens import issue_email_key
@@ -133,6 +134,12 @@ class AuthFlowTests(TestCase):
         )
         self.assertIn("k=abc123xyz456", html)
         self.assertNotIn("token=", html)
+
+    def test_build_ssl_context_variants(self):
+        verified_ctx = _build_ssl_context(False)
+        unverified_ctx = _build_ssl_context(True)
+        self.assertTrue(verified_ctx.check_hostname)
+        self.assertFalse(unverified_ctx.check_hostname)
 
     @patch(
         "authflow.views.verify_google_id_token",

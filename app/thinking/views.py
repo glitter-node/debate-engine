@@ -346,7 +346,7 @@ class ThesisCreateView(LoginRequiredMixin, FormView):
             ctx["argument_formset"] = ArgumentFormSet()
         return ctx
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **_kwargs):
         form = self.get_form()
         argument_formset = ArgumentFormSet(request.POST)
         if form.is_valid() and argument_formset.is_valid():
@@ -688,7 +688,7 @@ class _ReportCreateView(LoginRequiredMixin, View):
     def get_target(self, **kwargs):
         return get_object_or_404(self.model.objects, pk=kwargs.get("pk"))
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         target = self.get_target(**kwargs)
         return_url = _report_return_url_for(target)
         if not allow_report_submit(getattr(request.user, "id", None)):
@@ -759,7 +759,7 @@ class _ModerationReportUpdateView(RoleRequiredMixin, View):
     next_status = None
     audit_action = ""
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         report = get_object_or_404(ContentReport, pk=kwargs.get("pk"))
         if report.status != ContentReport.Status.OPEN:
             return redirect("thinking:moderation_panel")
@@ -805,7 +805,7 @@ class ModerationReportBulkUpdateView(RoleRequiredMixin, View):
             return redirect(f"{url}?{query}")
         return redirect(url)
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         action = request.POST.get("action", "").strip().lower()
         if action not in self.ACTION_TO_STATUS:
             return HttpResponse(
@@ -868,7 +868,7 @@ class _ModerationStatusSetView(RoleRequiredMixin, View):
     def redirect_response(self, target):
         raise NotImplementedError
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         target = self.get_target(**kwargs)
         old_status = target.status
         new_status = request.POST.get("status", "").strip().lower()
@@ -931,7 +931,7 @@ class _ModerationDeleteRestoreView(RoleRequiredMixin, View):
 class ThesisSoftDeleteView(_ModerationDeleteRestoreView):
     model = Thesis
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         thesis = self.get_target(**kwargs)
         previous_deleted_at = thesis.deleted_at
         if thesis.soft_delete(actor=request.user):
@@ -952,7 +952,7 @@ class ThesisSoftDeleteView(_ModerationDeleteRestoreView):
 class ThesisRestoreView(_ModerationDeleteRestoreView):
     model = Thesis
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         thesis = self.get_target(**kwargs)
         previous_deleted_at = thesis.deleted_at
         if thesis.restore(actor=request.user):
@@ -969,7 +969,7 @@ class ThesisRestoreView(_ModerationDeleteRestoreView):
 class CounterSoftDeleteView(_ModerationDeleteRestoreView):
     model = Counter
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         counter = self.get_target(**kwargs)
         previous_deleted_at = counter.deleted_at
         if counter.soft_delete(actor=request.user):
@@ -990,7 +990,7 @@ class CounterSoftDeleteView(_ModerationDeleteRestoreView):
 class CounterRestoreView(_ModerationDeleteRestoreView):
     model = Counter
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_args, **kwargs):
         counter = self.get_target(**kwargs)
         previous_deleted_at = counter.deleted_at
         if counter.restore(actor=request.user):

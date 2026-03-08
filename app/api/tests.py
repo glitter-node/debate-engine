@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from ipaddress import ip_network
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from unittest.mock import patch
+
+from api.middleware.ip_block import IPBlocker, is_internal_ip, is_trusted_bot
 from thinking.models import Argument, Counter, Thesis
 
 
@@ -57,7 +62,7 @@ class ApiEndpointTests(TestCase):
             stance=Thesis.Stance.PRO,
             author=user,
         )
-        thesis_b = Thesis.objects.create(
+        Thesis.objects.create(
             title="B",
             summary="summary",
             stance=Thesis.Stance.CON,
@@ -116,3 +121,24 @@ class ApiEndpointTests(TestCase):
         weird_ids = [item["id"] for item in weird_data["theses"]]
         active_ids = [item["id"] for item in active_data["theses"]]
         self.assertEqual(weird_ids, active_ids)
+
+
+class ApiMiddlewareHelperTests(TestCase):
+    def test_is_internal_ip_uses_configured_ranges(self):
+        with patch(
+            "api.middleware.ip_block.const.INTERNAL_IP_RANGES",
+            (ip_network("127.0.0.0/8"),),
+        ):
+            self.assertTrue(is_internal_ip("127.0.0.1"))
+            self.assertFalse(is_internal_ip("203.0.113.10"))
+
+    def test_is_trusted_bot_matches_user_agent(self):
+        with patch("api.middleware.ip_block.const.TRUSTED_BOTS", ("Googlebot",)):
+            self.assertTrue(is_trusted_bot("Mozilla/5.0 Googlebot/2.1"))
+            self.assertFalse(is_trusted_bot("Mozilla/5.0 Safari"))
+
+    def test_ip_blocker_stop_watcher_sets_stop_event(self):
+        blocker = IPBlocker(path="/tmp/does-not-exist.json", interval=1)
+        blocker.start_watcher_once()
+        blocker.stop_watcher()
+        self.assertTrue(blocker._stop_event.is_set())

@@ -25,16 +25,13 @@ class ArgumentAdmin(admin.ModelAdmin):
         "id",
         "thesis",
         "order",
-        "author",
-        "status",
         "short_body",
         "created_at",
-        "updated_at",
     )
-    list_filter = ("thesis", "status", "created_at", "deleted_at")
-    search_fields = ("thesis__title", "body", "author__username")
+    list_filter = ("thesis", "created_at")
+    search_fields = ("thesis__title", "body")
     ordering = ("thesis__id", "order", "id")
-    list_select_related = ("thesis", "author")
+    list_select_related = ("thesis",)
 
     @admin.display(description="Body")
     def short_body(self, obj):
@@ -139,4 +136,3 @@ class AuditLogAdmin(admin.ModelAdmin):
             obj.metadata or {}, indent=2, sort_keys=True, ensure_ascii=False
         )
         return format_html("<pre>{}</pre>", escape(pretty))
-    
