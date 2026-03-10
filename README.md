@@ -1,8 +1,6 @@
-# Debate Engine - Glitter.im
+# Debate Engine - [Glitter.im](https://djangoproto8.glitter.im)
 
 **Debate Domain Prototype**
-
-Website: https://djangoproto8.glitter.im
 
 This project explores **debate-domain modeling** for structured discussion systems.
 
@@ -215,7 +213,7 @@ Feedback is welcome, especially regarding:
 [glitter.im](https://djangoproto8.glitter.im)
 
 **Repository**  
-https://github.com/glitter-node/debate-engine
+[Debate Engine](https://github.com/glitter-node/debate-engine)
 
 ---
 
