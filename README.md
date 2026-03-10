@@ -2,7 +2,7 @@
 
 **Debate Domain Prototype**
 
-Website: https://glitter.im
+Website: https://djangoproto8.glitter.im
 
 This project explores **debate-domain modeling** for structured discussion systems.
 
@@ -212,7 +212,7 @@ Feedback is welcome, especially regarding:
 ## Links
 
 **Website**  
-https://glitter.im
+[glitter.im](https://djangoproto8.glitter.im)
 
 **Repository**  
 https://github.com/glitter-node/debate-engine
