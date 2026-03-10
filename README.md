@@ -1,4 +1,4 @@
-# Debate Engine - [Glitter.im](https://djangoproto8.glitter.im)
+# Debate Engine - Glitter.im
 
 **Debate Domain Prototype**
 
@@ -150,15 +150,44 @@ The system supports both:
 
 The project uses **Django with MariaDB/MySQL by default**.
 
-Typical development commands:
+Create a virtual environment and install dependencies:
 
 ```bash
-./run_manage.sh check
-APP_ENV=test ./run_manage.sh test
-make test
-make lint
-make ci
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
+
+### Environment configuration
+
+Environment variables are loaded from the file specified by `APP_ENV_FILE`.
+
+`/volume1/hwi/config/env/DjangoProto8/.env`
+
+This path is specific to the production server and **does not need to be used in development**.
+
+For local development:
+
+```bash
+cp .env.example .env
+export APP_ENV_FILE=.env
+```
+
+Run database migrations:
+
+```bash
+./run_manage.sh migrate
+```
+
+Start the application server:
+
+```bash
+./run_gunicorn.sh
+```
+
+---
+
+## Tests
 
 The test suite currently includes:
 
@@ -207,7 +236,7 @@ Feedback is welcome, especially regarding:
 
 ---
 
-## Links
+## Resources
 
 **Website**  
 [glitter.im](https://djangoproto8.glitter.im)
