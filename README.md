@@ -215,7 +215,7 @@ Feedback is welcome, especially regarding:
 https://glitter.im
 
 **Repository**  
-https://github.com/glitter-node/structured-debate
+https://github.com/glitter-node/debate-engine
 
 ---
 
