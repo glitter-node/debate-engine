@@ -5,17 +5,16 @@ import os
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
+from authflow.env import get_authflow_settings
+from authflow.google_oauth import GoogleTokenVerificationError
+from authflow.mail import _build_ssl_context
+from authflow.models import EmailAuthToken, GoogleAccountLink
+from authflow.tokens import issue_email_key
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import TestCase
 from django.utils import timezone
-
-from authflow.env import get_authflow_settings
-from authflow.mail import _build_ssl_context
-from authflow.models import EmailAuthToken, GoogleAccountLink
-from authflow.google_oauth import GoogleTokenVerificationError
-from authflow.tokens import issue_email_key
 from thinking.models import AuditLog
 from thinking.site_roles import SiteRole
 
@@ -58,7 +57,10 @@ class AuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/auth/?sent=1")
         self.assertEqual(EmailAuthToken.objects.count(), 1)
+
         token_obj = EmailAuthToken.objects.first()
+        self.assertIsNotNone(token_obj)
+        assert token_obj is not None
         self.assertEqual(token_obj.email, "user@example.com")
 
         verify_url = mock_send.call_args.kwargs["verify_url"]

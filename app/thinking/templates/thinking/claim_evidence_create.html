@@ -1,0 +1,45 @@
+{% extends "thinking/base.html" %}
+{% block title %}Add Claim Evidence · glitter.im{% endblock %}
+{% block meta_description %}Add evidence to a claim in the archive on glitter.im.{% endblock %}
+{% block content %}
+<h1 class="h1">Add Claim Evidence</h1>
+<div class="meta">{{ thesis.title }}</div>
+<div class="prose">{{ claim.body|linebreaksbr }}</div>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="form_block">
+    <label class="label" for="{{ form.url.id_for_label }}">URL</label>
+    {{ form.url.errors }}
+    {{ form.url }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.title.id_for_label }}">Title</label>
+    {{ form.title.errors }}
+    {{ form.title }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.source_label.id_for_label }}">Source</label>
+    {{ form.source_label.errors }}
+    {{ form.source_label }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.citation_count.id_for_label }}">Citation count</label>
+    {{ form.citation_count.errors }}
+    {{ form.citation_count }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.trust_score.id_for_label }}">Trust score</label>
+    {{ form.trust_score.errors }}
+    {{ form.trust_score }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.excerpt.id_for_label }}">Excerpt</label>
+    {{ form.excerpt.errors }}
+    {{ form.excerpt }}
+  </div>
+
+  <button class="button" type="submit">Save evidence</button>
+</form>
+{% endblock %}

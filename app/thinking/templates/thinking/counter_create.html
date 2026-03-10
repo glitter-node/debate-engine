@@ -4,9 +4,13 @@
 {% block content %}
 <h1 class="h1">Add Counter</h1>
 <div class="meta">{{ thesis.title }}</div>
+{% if parent_counter %}
+<div class="meta">Replying to counter #{{ parent_counter.id }}</div>
+{% endif %}
 
 <form method="post" class="form">
   {% csrf_token %}
+  {{ form.parent_counter }}
   <div class="form_block">
     <label class="label">Target argument</label>
     {{ form.target_argument }}

@@ -5,6 +5,16 @@ app.thinking.urls - URL configuration for the "thinking" app.
 from django.urls import path
 
 from .views import (
+    ArgumentClaimConvertView,
+    ClaimCreateView,
+    ClaimDuplicateReviewPreviewView,
+    ClaimDuplicateReviewView,
+    ClaimEditView,
+    ClaimEvidenceCreateView,
+    ClaimMergePreviewView,
+    ClaimMergeView,
+    ClaimVoteCreateView,
+    CounterClaimConvertView,
     CounterReportCreateView,
     CounterRestoreView,
     CounterSoftDeleteView,
@@ -33,6 +43,48 @@ urlpatterns = [
     path("theses/", ThesisListView.as_view(), name="thesis_list"),
     path("theses/new/", ThesisCreateView.as_view(), name="thesis_create"),
     path("theses/<int:pk>/", ThesisDetailView.as_view(), name="thesis_detail"),
+    path("theses/<int:pk>/claims/new/", ClaimCreateView.as_view(), name="claim_create"),
+    path("claims/<int:pk>/edit/", ClaimEditView.as_view(), name="claim_edit"),
+    path(
+        "claims/<int:pk>/evidence/new/",
+        ClaimEvidenceCreateView.as_view(),
+        name="claim_evidence_create",
+    ),
+    path(
+        "claims/<int:pk>/vote/",
+        ClaimVoteCreateView.as_view(),
+        name="claim_vote",
+    ),
+    path(
+        "claims/merge/",
+        ClaimMergePreviewView.as_view(),
+        name="claim_merge_preview",
+    ),
+    path(
+        "claims/duplicates/",
+        ClaimDuplicateReviewPreviewView.as_view(),
+        name="claim_duplicate_review_preview",
+    ),
+    path(
+        "claims/duplicates/review/",
+        ClaimDuplicateReviewView.as_view(),
+        name="claim_duplicate_review",
+    ),
+    path(
+        "claims/merge/execute/",
+        ClaimMergeView.as_view(),
+        name="claim_merge",
+    ),
+    path(
+        "arguments/<int:pk>/archive/",
+        ArgumentClaimConvertView.as_view(),
+        name="argument_claim_convert",
+    ),
+    path(
+        "counters/<int:pk>/archive/",
+        CounterClaimConvertView.as_view(),
+        name="counter_claim_convert",
+    ),
     path(
         "theses/<int:pk>/counter/", CounterCreateView.as_view(), name="counter_create"
     ),

@@ -1,0 +1,24 @@
+{% extends "thinking/base.html" %}
+{% block title %}Edit Claim · glitter.im{% endblock %}
+{% block meta_description %}Edit a claim and preserve revision history on glitter.im.{% endblock %}
+{% block content %}
+<h1 class="h1">Edit Claim</h1>
+<div class="meta">{{ thesis.title }}</div>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="form_block">
+    <label class="label" for="{{ form.body.id_for_label }}">Claim</label>
+    {{ form.body.errors }}
+    {{ form.body }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.status.id_for_label }}">Status</label>
+    {{ form.status.errors }}
+    {{ form.status }}
+  </div>
+
+  <button class="button" type="submit">Save claim</button>
+</form>
+{% endblock %}

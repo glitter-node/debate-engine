@@ -1,0 +1,90 @@
+{% load thinking_extras %}
+<li class="list_item" id="counter-{{ c.pk }}">
+  <div class="status_row">
+    <span class="badge status_badge status_{{ c.status }}">{{ c.status|title }}</span>
+    {% if c.deleted_at and can_moderate %}
+    <span class="badge status_badge status_deleted">Deleted</span>
+    {% endif %}
+  </div>
+  <div class="prose">{{ c.body|linebreaksbr }}</div>
+  <div class="meta">
+    {{ c.author.username }} · {{ c.created_at|date:"Y-m-d H:i" }}
+  </div>
+  {% with mapped_claim=counter_claim_map|get_item:c.id %}
+  {% if mapped_claim %}
+  <div class="meta">
+    Archived as <a href="#claim-{{ mapped_claim.id }}">Claim #{{ mapped_claim.id }}</a>
+  </div>
+  {% elif user.is_authenticated %}
+  <form class="row moderation_form" method="post" action="{% url 'thinking:counter_claim_convert' pk=c.id %}">
+    {% csrf_token %}
+    <button class="button" type="submit">Archive as Claim</button>
+  </form>
+  {% endif %}
+  {% endwith %}
+  {% if user.is_authenticated %}
+  <div class="moderation_form">
+    <a
+      class="small_link"
+      href="{% url 'thinking:counter_create' pk=thesis.pk %}?parent_counter={{ c.pk }}"
+    >
+      Reply
+    </a>
+    {% if c.id in counter_report_open_ids %}
+    <div class="muted">You already reported this counter.</div>
+    {% else %}
+    <form class="row" method="post" action="{% url 'thinking:report_counter' pk=c.pk %}">
+      {% csrf_token %}
+      <label class="label" for="report-counter-reason-{{ c.pk }}">Report counter</label>
+      <select class="select" id="report-counter-reason-{{ c.pk }}" name="reason">
+        {% for reason in report_reason_choices %}
+        <option value="{{ reason }}">{{ reason|title }}</option>
+        {% endfor %}
+      </select>
+      <label class="label" for="report-counter-detail-{{ c.pk }}">Details (optional)</label>
+      <textarea class="textarea" id="report-counter-detail-{{ c.pk }}" name="detail" rows="3"></textarea>
+      <button class="button" type="submit">Submit report</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if can_moderate and c.id in counter_next_statuses %}
+  {% with next_statuses=counter_next_statuses|get_item:c.id %}
+    {% if next_statuses %}
+    <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_set_status' pk=c.pk %}">
+      {% csrf_token %}
+      <label class="label" for="counter-status-{{ c.pk }}">Counter status</label>
+      <select class="select" id="counter-status-{{ c.pk }}" name="status">
+        {% for value, label in status_choices %}
+          {% if value in next_statuses %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <button class="button" type="submit">Apply</button>
+    </form>
+    {% endif %}
+  {% endwith %}
+  {% endif %}
+  {% if can_moderate %}
+  {% if c.deleted_at %}
+  <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_restore' pk=c.pk %}">
+    {% csrf_token %}
+    <button class="button" type="submit">Restore counter</button>
+  </form>
+  {% else %}
+  <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_delete' pk=c.pk %}">
+    {% csrf_token %}
+    <button class="button" type="submit">Delete counter</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if c.rebuttal_children %}
+  <ul class="list">
+    {% for child in c.rebuttal_children %}
+    {% include "thinking/_counter_node.html" with c=child thesis=thesis %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>

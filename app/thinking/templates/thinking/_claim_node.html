@@ -1,0 +1,217 @@
+{% load thinking_extras %}
+<li class="list_item" id="claim-{{ claim.pk }}">
+  {% if incoming_relation_label %}
+  <div class="meta">{{ incoming_relation_label }}</div>
+  {% endif %}
+  <div class="badge">Claim</div>
+  <div class="prose">{{ claim.body|linebreaksbr }}</div>
+  <div class="meta">
+    {{ claim.author.username }} · {{ claim.created_at|date:"Y-m-d H:i" }}
+  </div>
+  {% with rank=claim_rank_positions|get_item:claim.id %}
+  {% if rank %}
+  <div class="meta">Rank #{{ rank }}</div>
+  {% endif %}
+  {% endwith %}
+  {% with score=claim_score_map|get_item:claim.id %}
+  {% if score %}
+  <div class="meta">
+    Strength {{ score.final_score|floatformat:2 }}
+    · Vote confidence {{ score.bayesian_vote_score|floatformat:3 }}
+    · Evidence strength {{ score.evidence_score|floatformat:2 }}
+    · PageRank influence {{ score.pagerank_score|floatformat:4 }}
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% with normalized=claim_normalized_map|get_item:claim.id %}
+  {% if normalized %}
+  <div class="meta">
+    Triple:
+    <a href="{% url 'thinking:thesis_detail' pk=thesis.pk %}?entity={{ normalized.triple.subject_entity.canonical_name|urlencode }}"><strong>{{ normalized.triple.subject_entity.canonical_name }}</strong></a>
+    →
+    <strong>{{ normalized.triple.predicate.name }}</strong>
+    →
+    <a href="{% url 'thinking:thesis_detail' pk=thesis.pk %}?entity={{ normalized.triple.object_entity.canonical_name|urlencode }}"><strong>{{ normalized.triple.object_entity.canonical_name }}</strong></a>
+    · Confidence {{ normalized.confidence|floatformat:2 }}
+  </div>
+  {% with aliases=claim_alias_map|get_item:claim.id %}
+  {% if aliases %}
+  <div class="meta">
+    Aliases:
+    {% for alias in aliases %}
+      {{ alias.alias_text }}{% if not forloop.last %}, {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% endif %}
+  {% endwith %}
+  {% with totals=claim_vote_totals|get_item:claim.id %}
+  <div class="meta">
+    Score {{ totals.score }} · Upvotes {{ totals.upvotes }} · Downvotes {{ totals.downvotes }}
+    {% if user_claim_votes|get_item:claim.id %}
+    · You voted {{ user_claim_votes|get_item:claim.id }}
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% if user.is_authenticated %}
+  <div class="moderation_form">
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_create' pk=thesis.pk %}?target_claim={{ claim.pk }}&relation_type=support"
+    >
+      Support
+    </a>
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_create' pk=thesis.pk %}?target_claim={{ claim.pk }}&relation_type=oppose"
+    >
+      Oppose
+    </a>
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_create' pk=thesis.pk %}?target_claim={{ claim.pk }}&relation_type=clarify"
+    >
+      Clarify
+    </a>
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_create' pk=thesis.pk %}?target_claim={{ claim.pk }}&relation_type=question"
+    >
+      Question
+    </a>
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_evidence_create' pk=claim.pk %}"
+    >
+      Add evidence
+    </a>
+    <a
+      class="small_link"
+      href="{% url 'thinking:claim_edit' pk=claim.pk %}"
+    >
+      Edit
+    </a>
+  </div>
+  <div class="moderation_form">
+    <form class="row" method="post" action="{% url 'thinking:claim_vote' pk=claim.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="vote_type" value="upvote" />
+      <button class="button" type="submit">Upvote</button>
+    </form>
+    <form class="row" method="post" action="{% url 'thinking:claim_vote' pk=claim.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="vote_type" value="downvote" />
+      <button class="button" type="submit">Downvote</button>
+    </form>
+  </div>
+  {% endif %}
+  {% with evidence_items=claim_evidence_map|get_item:claim.id %}
+  {% if evidence_items %}
+  <div class="counters">
+    <div class="h3">Evidence</div>
+    <ul class="list">
+      {% for evidence in evidence_items %}
+      <li class="list_item">
+        <a href="{{ evidence.url }}">{{ evidence.title }}</a>
+        <div class="meta">
+          {{ evidence.created_by.username }} · {{ evidence.created_at|date:"Y-m-d H:i" }}
+          {% if evidence.source_label %}
+          · Source {{ evidence.source_label }}
+          {% endif %}
+          · Citations {{ evidence.citation_count }}
+          · Trust {{ evidence.trust_score|floatformat:1 }}
+        </div>
+        {% if evidence.excerpt %}
+        <div class="prose">{{ evidence.excerpt|linebreaksbr }}</div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% with revisions=claim_revision_map|get_item:claim.id %}
+  {% if revisions %}
+  <div class="counters">
+    <div class="h3">Revision History</div>
+    <ul class="list">
+      {% for revision in revisions %}
+      <li class="list_item">
+        <div class="meta">
+          {{ revision.edited_by.username }} · {{ revision.edited_at|date:"Y-m-d H:i" }}
+        </div>
+        <div class="prose">{{ revision.previous_body|linebreaksbr }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% with inferred_rows=claim_inference_map|get_item:claim.id %}
+  {% if inferred_rows %}
+  <div class="counters">
+    <div class="h3">Derived Claims</div>
+    <ul class="list">
+      {% for inference in inferred_rows %}
+      <li class="list_item">
+        <a href="#claim-{{ inference.inferred_claim_id }}">Claim #{{ inference.inferred_claim_id }}</a>
+        <div class="meta">
+          Rule {{ inference.rule.name }} · Confidence {{ inference.confidence|floatformat:2 }}
+        </div>
+        <div class="prose">{{ inference.inferred_claim.body|linebreaksbr }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% with contradictions=claim_contradiction_map|get_item:claim.id %}
+  {% if contradictions %}
+  <div class="counters">
+    <div class="h3">Contradiction Alerts</div>
+    <ul class="list">
+      {% for contradiction in contradictions %}
+      <li class="list_item">
+        {% if contradiction.claim_a_id == claim.id %}
+        <a href="#claim-{{ contradiction.claim_b_id }}">Conflicts with claim #{{ contradiction.claim_b_id }}</a>
+        <div class="prose">{{ contradiction.claim_b.body|linebreaksbr }}</div>
+        {% else %}
+        <a href="#claim-{{ contradiction.claim_a_id }}">Conflicts with claim #{{ contradiction.claim_a_id }}</a>
+        <div class="prose">{{ contradiction.claim_a.body|linebreaksbr }}</div>
+        {% endif %}
+        <div class="meta">
+          {{ contradiction.contradiction_type }} · Confidence {{ contradiction.confidence|floatformat:2 }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% with closure_rows=claim_support_closure_map|get_item:claim.id %}
+  {% if closure_rows %}
+  <div class="counters">
+    <div class="h3">Support Reach</div>
+    <ul class="list">
+      {% for row in closure_rows %}
+      <li class="list_item">
+        <a href="#claim-{{ row.target_claim_id }}">Supports claim #{{ row.target_claim_id }}</a>
+        <div class="meta">
+          Depth {{ row.support_depth }} · Confidence {{ row.confidence|floatformat:2 }}
+        </div>
+        <div class="prose">{{ row.target_claim.body|linebreaksbr }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% if claim.graph_children %}
+  <ul class="list">
+    {% for relation in claim.graph_children %}
+    {% include "thinking/_claim_node.html" with claim=relation.child_claim thesis=thesis incoming_relation_label=relation.relation_type.label %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>

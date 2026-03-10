@@ -33,6 +33,8 @@
           {% endif %}
           {% if user.is_staff or user.is_superuser %}
           <a class="nav_link" href="{% url 'admin:index' %}">Admin</a>
+          <a class="nav_link" href="{% url 'thinking:claim_merge_preview' %}">Claim Merge</a>
+          <a class="nav_link" href="{% url 'thinking:claim_duplicate_review_preview' %}">Claim Duplicates</a>
           {% endif %}
           <form class="nav_form" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
@@ -40,9 +42,9 @@
           </form>
           {% else %}
           <a class="nav_link" href="{% url 'authflow:home' %}">Sign in</a>
-          <a class="nav_link" href="{% url 'authflow:home' %}">Request access</a>
+          <!-- <a class="nav_link" href="{% url 'authflow:home' %}">Request access</a> -->
           {% endif %}
-          <a class="nav_link" href="/api/">API</a>
+          <!-- <a class="nav_link" href="/api/">API</a> -->
         </nav>
       </div>
     </header>

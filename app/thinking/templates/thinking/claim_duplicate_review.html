@@ -1,0 +1,95 @@
+{% extends "thinking/base.html" %}
+{% block title %}Claim Duplicate Review · glitter.im{% endblock %}
+{% block meta_description %}Review semantic duplicate claim candidates in the archive.{% endblock %}
+{% block content %}
+<h1 class="h1">Claim Duplicate Review</h1>
+<form method="get" class="form">
+  <div class="form_block">
+    <label class="label" for="claim-duplicate-search">Search claims</label>
+    <input class="input" id="claim-duplicate-search" type="text" name="q" value="{{ search_query }}" />
+  </div>
+  <button class="button" type="submit">Search</button>
+</form>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="form_block">
+    <label class="label" for="{{ form.claim_a.id_for_label }}">Canonical claim</label>
+    {{ form.claim_a.errors }}
+    {{ form.claim_a }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.claim_b.id_for_label }}">Duplicate claim</label>
+    {{ form.claim_b.errors }}
+    {{ form.claim_b }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.decision.id_for_label }}">Decision</label>
+    {{ form.decision.errors }}
+    {{ form.decision }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.reason.id_for_label }}">Reason</label>
+    {{ form.reason.errors }}
+    {{ form.reason }}
+  </div>
+  <button class="button" type="submit">Review Duplicate Pair</button>
+</form>
+
+{% if claim_a and claim_b %}
+<section class="block">
+  <h2 class="h2">Selected Pair</h2>
+  <div class="argument">
+    <div class="h3">Canonical Claim #{{ claim_a.id }}</div>
+    <div class="prose">{{ claim_a.body|linebreaksbr }}</div>
+  </div>
+  <div class="argument">
+    <div class="h3">Duplicate Claim #{{ claim_b.id }}</div>
+    <div class="prose">{{ claim_b.body|linebreaksbr }}</div>
+  </div>
+  <form method="post" action="{% url 'thinking:claim_duplicate_review' %}?q={{ search_query|urlencode }}" class="form">
+    {% csrf_token %}
+    <input type="hidden" name="claim_a" value="{{ claim_a.id }}" />
+    <input type="hidden" name="claim_b" value="{{ claim_b.id }}" />
+    <input type="hidden" name="decision" value="{{ form.cleaned_data.decision|default:'merge' }}" />
+    <input type="hidden" name="reason" value="{{ form.cleaned_data.reason|default:'' }}" />
+    <button class="button" type="submit">Apply Decision</button>
+  </form>
+</section>
+{% endif %}
+
+{% if candidate_duplicates %}
+<section class="block">
+  <h2 class="h2">Duplicate Candidates</h2>
+  <ul class="list">
+    {% for pair in candidate_duplicates %}
+    <li class="list_item">
+      <div class="meta">
+        Similarity {{ pair.similarity_score|floatformat:3 }} ·
+        Claim #{{ pair.claim_a_id }} ↔ Claim #{{ pair.claim_b_id }}
+      </div>
+      <div class="prose">{{ pair.claim_a.body|linebreaksbr }}</div>
+      <div class="prose">{{ pair.claim_b.body|linebreaksbr }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if duplicate_reviews %}
+<section class="block">
+  <h2 class="h2">Review History</h2>
+  <ul class="list">
+    {% for review in duplicate_reviews %}
+    <li class="list_item">
+      <div class="meta">
+        {{ review.reviewed_at|date:"Y-m-d H:i" }} · {{ review.reviewed_by.username }} ·
+        {{ review.claim_a_id }} ↔ {{ review.claim_b_id }} · {{ review.decision|title }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

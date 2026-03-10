@@ -1,0 +1,53 @@
+{% extends "thinking/base.html" %}
+{% block title %}Add Claim · glitter.im{% endblock %}
+{% block meta_description %}Add a claim to the argument archive on glitter.im.{% endblock %}
+{% block content %}
+<h1 class="h1">Add Claim</h1>
+<div class="meta">{{ thesis.title }}</div>
+{% if target_claim %}
+<div class="meta">Linking to claim #{{ target_claim.id }}</div>
+{% endif %}
+{% if duplicate_suggestions %}
+<section class="block">
+  <h2 class="h2">Possible Duplicates</h2>
+  <div class="status_banner status_pending_review">
+    Similar archived claims already exist. Review before posting.
+  </div>
+  <ul class="list">
+    {% for similarity, suggestion in duplicate_suggestions %}
+    <li class="list_item">
+      <div class="meta">Similarity {{ similarity|floatformat:3 }} · Claim #{{ suggestion.id }}</div>
+      <div class="prose">{{ suggestion.body|linebreaksbr }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="form_block">
+    <label class="label" for="{{ form.body.id_for_label }}">Claim</label>
+    {{ form.body.errors }}
+    {{ form.body }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.status.id_for_label }}">Status</label>
+    {{ form.status.errors }}
+    {{ form.status }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.target_claim.id_for_label }}">Target claim</label>
+    {{ form.target_claim.errors }}
+    {{ form.target_claim }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.relation_type.id_for_label }}">Relation type</label>
+    {{ form.relation_type.errors }}
+    {{ form.relation_type }}
+  </div>
+
+  <button class="button" type="submit">Post claim</button>
+</form>
+{% endblock %}

@@ -26,7 +26,7 @@ if not SECRET_KEY:
         raise RuntimeError("DJANGO_SECRET_KEY is required when DJANGO_DEBUG is false.")
 
 ALLOWED_HOSTS = parse_csv(os.environ.get("DJANGO_ALLOWED_HOSTS")) or [
-    "djangoproto8.glitter.kr",
+    "djangoproto8.glitter.im",
 ]
 if APP_ENV in {"development", "dev", "local", "test"}:
     for _host in ("127.0.0.1", "localhost"):
@@ -137,7 +137,7 @@ CORS_ALLOWED_ORIGINS = parse_csv(os.environ.get("CORS_ALLOWED_ORIGINS"))
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_TRUSTED_ORIGINS = parse_csv(os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS")) or [
-    "https://djangoproto8.glitter.kr"
+    "https://djangoproto8.glitter.im",
 ]
 
 SECURE_SSL_REDIRECT = not DEBUG

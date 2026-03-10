@@ -102,75 +102,25 @@
       </div>
 
       <div class="prose">{{ a.body|linebreaksbr }}</div>
+      {% with mapped_claim=argument_claim_map|get_item:a.id %}
+      {% if mapped_claim %}
+      <div class="meta">
+        Archived as <a href="#claim-{{ mapped_claim.id }}">Claim #{{ mapped_claim.id }}</a>
+      </div>
+      {% elif user.is_authenticated %}
+      <form class="row moderation_form" method="post" action="{% url 'thinking:argument_claim_convert' pk=a.id %}">
+        {% csrf_token %}
+        <button class="button" type="submit">Archive as Claim</button>
+      </form>
+      {% endif %}
+      {% endwith %}
 
       <div class="counters">
         <div class="h3">Counters</div>
         {% with counters=counters_by_argument|get_item:a.id %} {% if counters %}
         <ul class="list">
           {% for c in counters %}
-          <li class="list_item" id="counter-{{ c.pk }}">
-            <div class="status_row">
-              <span class="badge status_badge status_{{ c.status }}">{{ c.status|title }}</span>
-              {% if c.deleted_at and can_moderate %}
-              <span class="badge status_badge status_deleted">Deleted</span>
-              {% endif %}
-            </div>
-            <div class="prose">{{ c.body|linebreaksbr }}</div>
-            <div class="meta">
-              {{ c.author.username }} · {{ c.created_at|date:"Y-m-d H:i" }}
-            </div>
-            {% if user.is_authenticated %}
-            <div class="moderation_form">
-              {% if c.id in counter_report_open_ids %}
-              <div class="muted">You already reported this counter.</div>
-              {% else %}
-              <form class="row" method="post" action="{% url 'thinking:report_counter' pk=c.pk %}">
-                {% csrf_token %}
-                <label class="label" for="report-counter-reason-{{ c.pk }}">Report counter</label>
-                <select class="select" id="report-counter-reason-{{ c.pk }}" name="reason">
-                  {% for reason in report_reason_choices %}
-                  <option value="{{ reason }}">{{ reason|title }}</option>
-                  {% endfor %}
-                </select>
-                <label class="label" for="report-counter-detail-{{ c.pk }}">Details (optional)</label>
-                <textarea class="textarea" id="report-counter-detail-{{ c.pk }}" name="detail" rows="3"></textarea>
-                <button class="button" type="submit">Submit report</button>
-              </form>
-              {% endif %}
-            </div>
-            {% endif %}
-            {% if can_moderate and c.id in counter_next_statuses %}
-            {% with next_statuses=counter_next_statuses|get_item:c.id %}
-              {% if next_statuses %}
-              <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_set_status' pk=c.pk %}">
-                {% csrf_token %}
-                <label class="label" for="counter-status-{{ c.pk }}">Counter status</label>
-                <select class="select" id="counter-status-{{ c.pk }}" name="status">
-                  {% for value, label in status_choices %}
-                    {% if value in next_statuses %}
-                    <option value="{{ value }}">{{ label }}</option>
-                    {% endif %}
-                  {% endfor %}
-                </select>
-                <button class="button" type="submit">Apply</button>
-              </form>
-              {% endif %}
-            {% endwith %}
-            {% endif %}
-            {% if can_moderate %}
-            {% if c.deleted_at %}
-            <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_restore' pk=c.pk %}">
-              {% csrf_token %}
-              <button class="button" type="submit">Restore counter</button>
-            </form>
-            {% else %}
-            <form class="row moderation_form" method="post" action="{% url 'thinking:moderation_counter_delete' pk=c.pk %}">
-              {% csrf_token %}
-              <button class="button" type="submit">Delete counter</button>
-            </form>
-            {% endif %}
-            {% endif %}
-          </li>
+          {% include "thinking/_counter_node.html" with c=c thesis=thesis %}
           {% endfor %}
         </ul>
         {% else %}
@@ -179,6 +129,115 @@
       </div>
     </div>
     {% endfor %}
+  </section>
+
+  <section class="block">
+    <div class="block_head">
+      <h2 class="h2">Claim Archive</h2>
+      {% if user.is_authenticated %}
+      <a class="button" href="{% url 'thinking:claim_create' pk=thesis.pk %}">Add Claim</a>
+      {% endif %}
+      {% if user.is_staff or user.is_superuser %}
+      <a class="button" href="{% url 'thinking:claim_merge_preview' %}?q={{ thesis.title|urlencode }}">Merge Claims</a>
+      <a class="button" href="{% url 'thinking:claim_duplicate_review_preview' %}?q={{ thesis.title|urlencode }}">Review Duplicates</a>
+      {% endif %}
+    </div>
+    <div class="meta">{{ claim_count }} archived claim{{ claim_count|pluralize }}</div>
+
+    {% if claim_roots %}
+    <ul class="list">
+      {% for claim in claim_roots %}
+      {% include "thinking/_claim_node.html" with claim=claim thesis=thesis %}
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="muted">No claims archived yet.</div>
+    {% endif %}
+
+    {% if ranked_claims %}
+    <div class="counters">
+      <div class="h3">Top Ranked Claims</div>
+      <ul class="list">
+        {% for score in ranked_claims %}
+        <li class="list_item">
+          <a href="#claim-{{ score.claim_id }}">Claim #{{ score.claim_id }}</a>
+          <div class="meta">
+            Rank #{{ forloop.counter }}
+            Strength {{ score.final_score|floatformat:2 }}
+            · Vote confidence {{ score.bayesian_vote_score|floatformat:3 }}
+            · Evidence {{ score.evidence_score|floatformat:2 }}
+            · Support influence {{ score.support_score|floatformat:4 }}
+            · Opposition influence {{ score.oppose_score|floatformat:4 }}
+            · PageRank {{ score.pagerank_score|floatformat:4 }}
+          </div>
+          <div class="prose">{{ score.claim.body|truncatechars:220 }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if claim_triples %}
+    <div class="counters">
+      <div class="h3">Normalized Claim Triples</div>
+      <ul class="list">
+        {% for triple in claim_triples %}
+        <li class="list_item">
+          <a href="#claim-{{ triple.claim_id }}">Claim #{{ triple.claim_id }}</a>
+          <div class="meta">
+            {{ triple.subject_entity.canonical_name }}
+            → {{ triple.predicate.name }}
+            → {{ triple.object_entity.canonical_name }}
+            · Confidence {{ triple.confidence|floatformat:2 }}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if thesis_contradictions %}
+    <div class="counters">
+      <div class="h3">Contradiction Alerts</div>
+      <ul class="list">
+        {% for contradiction in thesis_contradictions %}
+        <li class="list_item">
+          <a href="#claim-{{ contradiction.claim_a_id }}">Claim #{{ contradiction.claim_a_id }}</a>
+          ↔
+          <a href="#claim-{{ contradiction.claim_b_id }}">Claim #{{ contradiction.claim_b_id }}</a>
+          <div class="meta">
+            {{ contradiction.contradiction_type }} · Confidence {{ contradiction.confidence|floatformat:2 }}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if selected_entity and selected_entity_claims %}
+    <div class="counters">
+      <div class="h3">Claims Related To {{ selected_entity }}</div>
+      <ul class="list">
+        {% for related_claim in selected_entity_claims %}
+        <li class="list_item">
+          <a href="#claim-{{ related_claim.id }}">Claim #{{ related_claim.id }}</a>
+          <div class="prose">{{ related_claim.body|linebreaksbr }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if legacy_claim_records %}
+    <div class="counters">
+      <div class="h3">Legacy debate mapping</div>
+      <ul class="list">
+        {% for record in legacy_claim_records %}
+        {% include "thinking/_legacy_claim_node.html" with record=record %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
   </section>
 </article>
 {% endblock %}

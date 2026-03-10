@@ -1,0 +1,11 @@
+<li class="list_item" id="{{ record.node_id }}">
+  <div class="meta">{{ record.relation_label }}</div>
+  <div class="prose">{{ record.body|linebreaksbr }}</div>
+  {% if record.children %}
+  <ul class="list">
+    {% for child in record.children %}
+    {% include "thinking/_legacy_claim_node.html" with record=child %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>

@@ -1,0 +1,102 @@
+{% extends "thinking/base.html" %}
+{% block title %}Claim Merge Tool · glitter.im{% endblock %}
+{% block meta_description %}Review and merge duplicate claims in the archive.{% endblock %}
+{% block content %}
+<h1 class="h1">Claim Merge Tool</h1>
+<div class="meta">
+  <a class="small_link" href="{% url 'thinking:claim_duplicate_review_preview' %}">Semantic duplicate review</a>
+</div>
+<form method="get" class="form">
+  <div class="form_block">
+    <label class="label" for="claim-merge-search">Search claims</label>
+    <input class="input" id="claim-merge-search" type="text" name="q" value="{{ search_query }}" />
+  </div>
+  <button class="button" type="submit">Search</button>
+</form>
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="form_block">
+    <label class="label" for="{{ form.source_claim.id_for_label }}">Source claim</label>
+    {{ form.source_claim.errors }}
+    {{ form.source_claim }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.target_claim.id_for_label }}">Target claim</label>
+    {{ form.target_claim.errors }}
+    {{ form.target_claim }}
+  </div>
+  <div class="form_block">
+    <label class="label" for="{{ form.reason.id_for_label }}">Reason</label>
+    {{ form.reason.errors }}
+    {{ form.reason }}
+  </div>
+  <button class="button" type="submit">Preview Merge</button>
+</form>
+
+{% if source_claim and target_claim %}
+<section class="block">
+  <h2 class="h2">Merge Preview</h2>
+  <div class="argument">
+    <div class="h3">Source Claim #{{ source_claim.id }}</div>
+    <div class="prose">{{ source_claim.body|linebreaksbr }}</div>
+    <div class="meta">
+      Thesis {{ source_claim.thesis.title }} · Evidence {{ source_stats.evidence_count }} · Votes {{ source_stats.vote_count }} · Outgoing {{ source_stats.outgoing_count }} · Incoming {{ source_stats.incoming_count }}
+    </div>
+  </div>
+  <div class="argument">
+    <div class="h3">Target Claim #{{ target_claim.id }}</div>
+    <div class="prose">{{ target_claim.body|linebreaksbr }}</div>
+    <div class="meta">
+      Thesis {{ target_claim.thesis.title }} · Evidence {{ target_stats.evidence_count }} · Votes {{ target_stats.vote_count }} · Outgoing {{ target_stats.outgoing_count }} · Incoming {{ target_stats.incoming_count }}
+    </div>
+  </div>
+  <form method="post" action="{% url 'thinking:claim_merge' %}?q={{ search_query|urlencode }}" class="form">
+    {% csrf_token %}
+    <input type="hidden" name="source_claim" value="{{ source_claim.id }}" />
+    <input type="hidden" name="target_claim" value="{{ target_claim.id }}" />
+    <input type="hidden" name="reason" value="{{ form.cleaned_data.reason|default:'' }}" />
+    <button class="button" type="submit">Execute Merge</button>
+  </form>
+
+  {% if source_history %}
+  <div class="counters">
+    <div class="h3">Source Merge History</div>
+    <ul class="list">
+      {% for log in source_history %}
+      <li class="list_item">{{ log.merged_at|date:"Y-m-d H:i" }} · {{ log.source_claim_id }} => {{ log.target_claim_id }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if target_history %}
+  <div class="counters">
+    <div class="h3">Target Merge History</div>
+    <ul class="list">
+      {% for log in target_history %}
+      <li class="list_item">{{ log.merged_at|date:"Y-m-d H:i" }} · {{ log.source_claim_id }} => {{ log.target_claim_id }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if candidate_claims %}
+<section class="block">
+  <h2 class="h2">Search Results</h2>
+  <ul class="list">
+    {% for claim in candidate_claims %}
+    <li class="list_item">
+      <div class="meta">Claim #{{ claim.id }} · {{ claim.thesis.title }}</div>
+      <div class="prose">{{ claim.body|linebreaksbr }}</div>
+      <div class="meta">
+        Evidence {{ claim.evidence_count }} · Votes {{ claim.vote_count }} · Outgoing {{ claim.outgoing_count }} · Incoming {{ claim.incoming_count }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -6,43 +6,95 @@ import csv
 from datetime import timedelta
 from io import StringIO
 
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
-from django.views.generic import DetailView, FormView, ListView, TemplateView
 from django.views.decorators.http import require_GET, require_POST
-
-from api.middleware.ip_resolver import get_client_ip
-
-from .auto_moderation import maybe_auto_moderate_after_report
-from .audit import log_action
-from .content_status import CONTENT_STATUS_CHOICES, ContentStatus
-from .forms import ArgumentFormSet, CounterForm, ThesisForm
-from .moderation_metrics import (
+from django.views.generic import DetailView, FormView, ListView, TemplateView
+from thinking.audit import log_action
+from thinking.content_status import CONTENT_STATUS_CHOICES, ContentStatus
+from thinking.domain.argument_service import (
+    add_evidence_to_claim,
+    cast_vote_for_claim,
+    calculate_thesis_claim_scores,
+    create_claim_for_thesis,
+    create_claim_from_argument,
+    create_claim_from_counter,
+    create_counter_for_thesis,
+    create_thesis_with_arguments,
+    merge_claims,
+    rebuild_thesis_inference_safe,
+    review_duplicate_pair,
+    update_claim_with_revision,
+)
+from thinking.forms import (
+    ArgumentFormSet,
+    ClaimDuplicateReviewForm,
+    ClaimEditForm,
+    ClaimEvidenceForm,
+    ClaimForm,
+    ClaimMergeSelectionForm,
+    CounterForm,
+    ThesisForm,
+)
+from thinking.models import (
+    Argument,
+    Claim,
+    ClaimEntity,
+    ClaimVote,
+    ContentReport,
+    Counter,
+    Thesis,
+)
+from thinking.moderation.moderation_actions import (
+    apply_report_status,
+    bulk_apply_report_status,
+)
+from thinking.moderation.report_service import submit_content_report
+from thinking.moderation_metrics import (
     ALLOWED_SINCE_DAYS,
     DEFAULT_SINCE_DAYS,
     ESCALATION_LEVEL_1,
     build_moderation_metrics,
-    escalation_level_for_count,
     escalation_min_count_for_level,
     get_stale_open_hours,
 )
-from .models import Argument, ContentReport, Counter, Thesis
-from .report_rate_limit import allow_report_submit
-from .roles import (
-    RoleRequiredMixin,
-    ensure_user_role,
-    role_required,
-    user_has_site_role,
+from thinking.queries.argument_queries import counters_by_argument, flatten_counters
+from thinking.queries.claim_graph import (
+    build_claim_graph,
+    build_legacy_claim_records,
+    claims_by_entity,
+    claim_contradiction_map,
+    claim_merge_candidates,
+    claim_merge_history,
+    claim_normalized_map,
+    claim_score_map,
+    claim_inference_map,
+    claim_support_closure_map,
+    claim_triples_for_thesis,
+    contradictions_for_thesis,
+    duplicate_claim_candidates,
+    duplicate_claim_reviews,
+    duplicate_claim_suggestions,
+    debate_claim_mapping_maps,
+    claim_evidence_map,
+    ranked_claims_for_thesis,
+    claim_revision_map,
+    claim_user_votes,
+    claim_vote_totals,
 )
-from .site_roles import SiteRole
+from thinking.queries.moderation_queries import build_report_rows
+from thinking.queries.thesis_tree import thesis_detail_queryset
+from thinking.report_rate_limit import allow_report_submit
+from thinking.roles import RoleRequiredMixin, role_required, user_has_site_role
+from thinking.site_roles import SiteRole
 
 MODERATION_ROLES = (SiteRole.MODERATOR, SiteRole.OPERATOR)
 MODERATION_PAGE_SIZE = 50
@@ -99,109 +151,67 @@ def _report_return_url_for(target) -> str:
     raise Http404
 
 
-def _report_target_key(report):
-    if report.thesis_id is not None:
-        return (ContentReport.TargetType.THESIS, report.thesis_id)
-    if report.counter_id is not None:
-        return (ContentReport.TargetType.COUNTER, report.counter_id)
-    return ("", 0)
-
-
 def _build_report_rows(reports, stale_cutoff=None):
-    if not reports:
-        return []
+    return build_report_rows(reports, stale_cutoff=stale_cutoff)
 
-    thesis_ids = sorted({report.thesis_id for report in reports if report.thesis_id})
-    counter_ids = sorted({report.counter_id for report in reports if report.counter_id})
 
-    open_count_map = {}
-    if thesis_ids:
-        for row in (
-            ContentReport.objects.filter(
-                status=ContentReport.Status.OPEN,
-                thesis_id__in=thesis_ids,
-            )
-            .values("thesis_id")
-            .annotate(open_count=Count("id"))
-        ):
-            open_count_map[(ContentReport.TargetType.THESIS, row["thesis_id"])] = row[
-                "open_count"
-            ]
-    if counter_ids:
-        for row in (
-            ContentReport.objects.filter(
-                status=ContentReport.Status.OPEN,
-                counter_id__in=counter_ids,
-            )
-            .values("counter_id")
-            .annotate(open_count=Count("id"))
-        ):
-            open_count_map[(ContentReport.TargetType.COUNTER, row["counter_id"])] = row[
-                "open_count"
-            ]
-
-    thesis_map = {
-        row["id"]: row
-        for row in Thesis.all_objects.filter(pk__in=thesis_ids).values(
-            "id", "title", "status", "deleted_at"
-        )
+def _claim_merge_preview_context(*, form, search_query: str):
+    source_claim = None
+    target_claim = None
+    if form.is_bound and form.is_valid():
+        source_claim = form.cleaned_data["source_claim"]
+        target_claim = form.cleaned_data["target_claim"]
+    source_stats = {
+        "evidence_count": source_claim.evidence_items.count() if source_claim else 0,
+        "vote_count": source_claim.votes.count() if source_claim else 0,
+        "outgoing_count": (
+            source_claim.outgoing_relations.count() if source_claim else 0
+        ),
+        "incoming_count": (
+            source_claim.incoming_relations.count() if source_claim else 0
+        ),
     }
-    counter_map = {
-        row["id"]: row
-        for row in Counter.all_objects.filter(pk__in=counter_ids).values(
-            "id", "thesis_id", "status", "deleted_at"
-        )
+    target_stats = {
+        "evidence_count": target_claim.evidence_items.count() if target_claim else 0,
+        "vote_count": target_claim.votes.count() if target_claim else 0,
+        "outgoing_count": (
+            target_claim.outgoing_relations.count() if target_claim else 0
+        ),
+        "incoming_count": (
+            target_claim.incoming_relations.count() if target_claim else 0
+        ),
     }
-    rows = []
-    for report in reports:
-        target_url = ""
-        target_label = f"{report.target_type} #{report.target_id}"
-        target_status = ""
-        target_deleted = False
-        key = _report_target_key(report)
-        open_count = open_count_map.get(key, 0)
-        escalation_level = escalation_level_for_count(open_count)
-        is_auto_moderated = open_count >= ESCALATION_LEVEL_1
-        is_stale = bool(
-            stale_cutoff is not None
-            and report.status == ContentReport.Status.OPEN
-            and report.created_at < stale_cutoff
-        )
-        if report.target_type == ContentReport.TargetType.THESIS:
-            thesis = thesis_map.get(report.thesis_id)
-            if thesis:
-                target_label = thesis["title"]
-                target_status = thesis["status"]
-                target_deleted = bool(thesis["deleted_at"])
-                target_url = reverse(
-                    "thinking:thesis_detail", kwargs={"pk": thesis["id"]}
-                )
-        elif report.target_type == ContentReport.TargetType.COUNTER:
-            counter = counter_map.get(report.counter_id)
-            if counter:
-                target_status = counter["status"]
-                target_deleted = bool(counter["deleted_at"])
-                target_label = f"Counter #{counter['id']}"
-                target_url = (
-                    reverse(
-                        "thinking:thesis_detail", kwargs={"pk": counter["thesis_id"]}
-                    )
-                    + f"#counter-{counter['id']}"
-                )
-        rows.append(
-            {
-                "report": report,
-                "target_label": target_label,
-                "target_url": target_url,
-                "target_status": target_status,
-                "target_deleted": target_deleted,
-                "open_count_for_target": open_count,
-                "escalation_level": escalation_level,
-                "is_auto_moderated": is_auto_moderated,
-                "is_stale": is_stale,
-            }
-        )
-    return rows
+    return {
+        "candidate_claims": claim_merge_candidates(search_query=search_query)[:50],
+        "form": form,
+        "search_query": search_query,
+        "source_claim": source_claim,
+        "source_stats": source_stats,
+        "target_claim": target_claim,
+        "target_stats": target_stats,
+        "source_history": claim_merge_history(claim=source_claim)[:20]
+        if source_claim
+        else [],
+        "target_history": claim_merge_history(claim=target_claim)[:20]
+        if target_claim
+        else [],
+    }
+
+
+def _claim_duplicate_review_context(*, form, search_query: str):
+    claim_a = None
+    claim_b = None
+    if form.is_bound and form.is_valid():
+        claim_a = form.cleaned_data["claim_a"]
+        claim_b = form.cleaned_data["claim_b"]
+    return {
+        "candidate_duplicates": duplicate_claim_candidates()[:50],
+        "duplicate_reviews": duplicate_claim_reviews()[:20],
+        "form": form,
+        "search_query": search_query,
+        "claim_a": claim_a,
+        "claim_b": claim_b,
+    }
 
 
 class HomeView(TemplateView):
@@ -274,42 +284,89 @@ class ThesisDetailView(DetailView):
     def get_queryset(self):
         can_moderate = user_has_site_role(self.request.user, *MODERATION_ROLES)
         include_deleted = _can_include_deleted(self.request)
-        counter_manager = (
-            Counter.all_objects
-            if (can_moderate and include_deleted)
-            else Counter.objects
+        return thesis_detail_queryset(
+            can_moderate=can_moderate,
+            include_deleted=include_deleted,
         )
-        counters_qs = counter_manager.select_related("author")
-        if not can_moderate:
-            counters_qs = counters_qs.filter(status=ContentStatus.ACTIVE)
-        arguments_qs = Argument.objects.prefetch_related(
-            Prefetch("counters", queryset=counters_qs)
-        )
-        thesis_manager = (
-            Thesis.all_objects if (can_moderate and include_deleted) else Thesis.objects
-        )
-        qs = thesis_manager.select_related("author").prefetch_related(
-            Prefetch("arguments", queryset=arguments_qs)
-        )
-        if not can_moderate:
-            qs = qs.filter(status=ContentStatus.ACTIVE)
-        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         thesis = ctx["thesis"]
         arguments = list(thesis.arguments.all())
-        counters_by_argument = {a.id: list(a.counters.all()) for a in arguments}
+        claims = list(thesis.claims.all())
+        if claims and not thesis.claims.filter(
+            Q(inference_sources_a__isnull=False)
+            | Q(inference_sources_b__isnull=False)
+            | Q(contradictions_left__isnull=False)
+            | Q(contradictions_right__isnull=False)
+            | Q(support_closure_sources__isnull=False)
+        ).exists():
+            rebuild_thesis_inference_safe(thesis=thesis)
+        if claims and any(getattr(claim, "score", None) is None for claim in claims):
+            score_instances = calculate_thesis_claim_scores(thesis)
+            for claim in claims:
+                claim.score = score_instances.get(claim.id)
+        all_counters = list(thesis.counters.all())
+        claim_mappings = list(thesis.claim_mappings.all())
+        counters_by_argument_map = counters_by_argument(arguments, all_counters)
+        all_visible_counters = flatten_counters(
+            [c for counters in counters_by_argument_map.values() for c in counters]
+        )
+        argument_claim_map, counter_claim_map = debate_claim_mapping_maps(
+            claim_mappings
+        )
+        claim_roots = build_claim_graph(claims)
         ctx["arguments"] = arguments
-        ctx["counters_by_argument"] = counters_by_argument
+        ctx["argument_claim_map"] = argument_claim_map
+        ctx["claim_roots"] = claim_roots
+        ctx["claim_count"] = len(claims)
+        ctx["claim_score_map"] = claim_score_map(claims)
+        (
+            ctx["claim_normalized_map"],
+            ctx["claim_alias_map"],
+        ) = claim_normalized_map(claims)
+        ctx["claim_vote_totals"] = claim_vote_totals(claims)
+        ctx["claim_evidence_map"] = claim_evidence_map(claims)
+        ranked_queryset = ranked_claims_for_thesis(thesis=thesis)
+        ranked_claim_ids = list(ranked_queryset.values_list("claim_id", flat=True))
+        ctx["ranked_claims"] = list(ranked_queryset[:10])
+        ctx["claim_rank_positions"] = {
+            claim_id: position
+            for position, claim_id in enumerate(ranked_claim_ids, start=1)
+        }
+        ctx["claim_revision_map"] = claim_revision_map(claims)
+        ctx["claim_triples"] = list(claim_triples_for_thesis(thesis=thesis)[:20])
+        ctx["claim_inference_map"] = claim_inference_map(thesis=thesis)
+        ctx["claim_contradiction_map"] = claim_contradiction_map(thesis=thesis)
+        ctx["claim_support_closure_map"] = claim_support_closure_map(thesis=thesis)
+        ctx["thesis_contradictions"] = list(
+            contradictions_for_thesis(thesis=thesis)[:10]
+        )
+        selected_entity = self.request.GET.get("entity", "").strip().lower()
+        ctx["selected_entity"] = selected_entity
+        selected_entity_obj = None
+        if selected_entity:
+            selected_entity_obj = ClaimEntity.objects.filter(
+                canonical_name=selected_entity
+            ).first()
+        ctx["selected_entity_claims"] = (
+            list(claims_by_entity(entity=selected_entity_obj))
+            if selected_entity_obj is not None
+            else []
+        )
+        ctx["legacy_claim_records"] = build_legacy_claim_records(
+            thesis=thesis,
+            arguments=arguments,
+            counters_by_argument_map=counters_by_argument_map,
+        )
+        ctx["counters_by_argument"] = counters_by_argument_map
+        ctx["counter_claim_map"] = counter_claim_map
         ctx["can_moderate"] = user_has_site_role(self.request.user, *MODERATION_ROLES)
         ctx["include_deleted"] = _can_include_deleted(self.request)
         ctx["status_choices"] = CONTENT_STATUS_CHOICES
         ctx["thesis_next_statuses"] = _allowed_next_statuses(thesis.status)
         ctx["counter_next_statuses"] = {
-            c.id: _allowed_next_statuses(c.status)
-            for counters in counters_by_argument.values()
-            for c in counters
+            c.id: _allowed_next_statuses(c.status) for c in all_visible_counters
         }
         if self.request.user.is_authenticated:
             open_reports_qs = ContentReport.objects.filter(
@@ -320,19 +377,23 @@ class ThesisDetailView(DetailView):
             counter_open_ids = set(
                 int(counter_id)
                 for counter_id in open_reports_qs.filter(
-                    counter_id__in=[
-                        c.id
-                        for counters in counters_by_argument.values()
-                        for c in counters
-                    ],
+                    counter_id__in=[c.id for c in all_visible_counters],
                 ).values_list("counter_id", flat=True)
+            )
+            user_claim_votes = claim_user_votes(
+                ClaimVote.objects.filter(
+                    user=self.request.user,
+                    claim_id__in=[claim.id for claim in claims],
+                )
             )
         else:
             thesis_open = False
             counter_open_ids = set()
+            user_claim_votes = {}
         ctx["report_reason_choices"] = REPORT_REASONS
         ctx["thesis_report_open"] = thesis_open
         ctx["counter_report_open_ids"] = counter_open_ids
+        ctx["user_claim_votes"] = user_claim_votes
         return ctx
 
 
@@ -350,18 +411,13 @@ class ThesisCreateView(LoginRequiredMixin, FormView):
         form = self.get_form()
         argument_formset = ArgumentFormSet(request.POST)
         if form.is_valid() and argument_formset.is_valid():
-            thesis = form.save(commit=False)
-            thesis.author = request.user
-            thesis.save()
-            argument_formset.instance = thesis
-            arguments = argument_formset.save(commit=False)
-            cleaned = [a for a in arguments if (a.body or "").strip()]
-            if not cleaned:
-                thesis.delete()
+            thesis = create_thesis_with_arguments(
+                form=form,
+                argument_formset=argument_formset,
+                author=request.user,
+            )
+            if thesis is None:
                 return self.form_invalid(form)
-            for a in cleaned:
-                a.thesis = thesis
-                a.save()
             cache.delete("thinking:home:lists")
             return redirect("thinking:thesis_detail", pk=thesis.pk)
         return self.render_to_response(
@@ -377,25 +433,330 @@ class CounterCreateView(LoginRequiredMixin, FormView):
         self.thesis = Thesis.objects.filter(pk=kwargs.get("pk")).first()
         if not self.thesis:
             raise Http404
+        raw_parent_id = request.POST.get("parent_counter") or request.GET.get(
+            "parent_counter"
+        )
+        self.parent_counter = None
+        if raw_parent_id:
+            try:
+                parent_id = int(raw_parent_id)
+            except (TypeError, ValueError):
+                raise Http404 from None
+            self.parent_counter = Counter.objects.filter(
+                pk=parent_id,
+                thesis=self.thesis,
+            ).first()
+            if self.parent_counter is None:
+                raise Http404
         return super().dispatch(request, *args, **kwargs)
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        form.fields["target_argument"].queryset = self.thesis.arguments.all()
+        target_queryset = self.thesis.arguments.all()
+        if self.parent_counter is not None:
+            target_queryset = target_queryset.filter(
+                pk=self.parent_counter.target_argument_id
+            )
+            form.initial["target_argument"] = self.parent_counter.target_argument_id
+            form.initial["parent_counter"] = self.parent_counter.id
+        form.fields["target_argument"].queryset = target_queryset
+        form.fields["parent_counter"].queryset = (
+            Counter.objects.filter(pk=self.parent_counter.pk)
+            if self.parent_counter
+            else Counter.objects.none()
+        )
         return form
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["thesis"] = self.thesis
+        ctx["parent_counter"] = self.parent_counter
         return ctx
 
     def form_valid(self, form):
-        counter = form.save(commit=False)
-        counter.thesis = self.thesis
-        counter.author = self.request.user
-        counter.save()
+        create_counter_for_thesis(
+            form=form,
+            thesis=self.thesis,
+            author=self.request.user,
+            parent_counter=self.parent_counter,
+        )
         cache.delete("thinking:home:lists")
         return redirect("thinking:thesis_detail", pk=self.thesis.pk)
+
+
+class ClaimCreateView(LoginRequiredMixin, FormView):
+    template_name = "thinking/claim_create.html"
+    form_class = ClaimForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.thesis = Thesis.objects.filter(pk=kwargs.get("pk")).first()
+        if not self.thesis:
+            raise Http404
+        self.target_claim = None
+        raw_target_id = request.POST.get("target_claim") or request.GET.get(
+            "target_claim"
+        )
+        if raw_target_id:
+            try:
+                target_id = int(raw_target_id)
+            except (TypeError, ValueError):
+                raise Http404 from None
+            self.target_claim = Claim.objects.filter(
+                pk=target_id,
+                thesis=self.thesis,
+            ).first()
+            if self.target_claim is None:
+                raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["thesis"] = self.thesis
+        return kwargs
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.target_claim is not None:
+            form.initial["target_claim"] = self.target_claim.id
+        raw_relation_type = self.request.GET.get("relation_type")
+        if raw_relation_type and not self.request.POST:
+            relation_type = form.fields["relation_type"].queryset.filter(
+                code=raw_relation_type
+            ).first()
+            if relation_type is not None:
+                form.initial["relation_type"] = relation_type.id
+        return form
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["thesis"] = self.thesis
+        ctx["target_claim"] = self.target_claim
+        form = ctx.get("form") or self.get_form()
+        claim_body = ""
+        if self.request.method == "POST":
+            claim_body = self.request.POST.get("body", "").strip()
+        elif form.initial.get("body"):
+            claim_body = form.initial["body"]
+        ctx["duplicate_suggestions"] = (
+            duplicate_claim_suggestions(
+                thesis=self.thesis,
+                body=claim_body,
+            )
+            if claim_body
+            else []
+        )
+        return ctx
+
+    def form_valid(self, form):
+        create_claim_for_thesis(
+            form=form,
+            thesis=self.thesis,
+            author=self.request.user,
+        )
+        cache.delete("thinking:home:lists")
+        return redirect("thinking:thesis_detail", pk=self.thesis.pk)
+
+
+class ClaimEvidenceCreateView(LoginRequiredMixin, FormView):
+    template_name = "thinking/claim_evidence_create.html"
+    form_class = ClaimEvidenceForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.claim = get_object_or_404(Claim, pk=kwargs.get("pk"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["claim"] = self.claim
+        ctx["thesis"] = self.claim.thesis
+        return ctx
+
+    def form_valid(self, form):
+        add_evidence_to_claim(
+            form=form,
+            claim=self.claim,
+            created_by=self.request.user,
+        )
+        return redirect("thinking:thesis_detail", pk=self.claim.thesis_id)
+
+
+class ClaimEditView(LoginRequiredMixin, FormView):
+    template_name = "thinking/claim_edit.html"
+    form_class = ClaimEditForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.claim = get_object_or_404(Claim, pk=kwargs.get("pk"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["instance"] = self.claim
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["claim"] = self.claim
+        ctx["thesis"] = self.claim.thesis
+        return ctx
+
+    def form_valid(self, form):
+        update_claim_with_revision(
+            form=form,
+            claim=self.claim,
+            edited_by=self.request.user,
+        )
+        return redirect("thinking:thesis_detail", pk=self.claim.thesis_id)
+
+
+class ClaimVoteCreateView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        claim = get_object_or_404(Claim, pk=kwargs.get("pk"))
+        vote_type = request.POST.get("vote_type", "").strip().lower()
+        if vote_type not in {
+            ClaimVote.VoteType.UPVOTE,
+            ClaimVote.VoteType.DOWNVOTE,
+        }:
+            raise Http404
+        try:
+            cast_vote_for_claim(
+                claim=claim,
+                user=request.user,
+                vote_type=vote_type,
+            )
+        except ValidationError:
+            pass
+        return redirect("thinking:thesis_detail", pk=claim.thesis_id)
+
+
+class _StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        user = self.request.user
+        return bool(user and user.is_active and (user.is_staff or user.is_superuser))
+
+
+class ClaimMergePreviewView(_StaffRequiredMixin, FormView):
+    template_name = "thinking/claim_merge_preview.html"
+    form_class = ClaimMergeSelectionForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["search_query"] = self.request.GET.get("q", "").strip()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        form = ctx["form"]
+        ctx.update(
+            _claim_merge_preview_context(
+                form=form,
+                search_query=self.request.GET.get("q", "").strip(),
+            )
+        )
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class ClaimMergeView(_StaffRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        search_query = request.GET.get("q", "").strip()
+        form = ClaimMergeSelectionForm(request.POST, search_query=search_query)
+        if not form.is_valid():
+            return render(
+                request,
+                "thinking/claim_merge_preview.html",
+                _claim_merge_preview_context(form=form, search_query=search_query),
+            )
+        try:
+            merge_claims(
+                source_claim=form.cleaned_data["source_claim"],
+                target_claim=form.cleaned_data["target_claim"],
+                admin_user=request.user,
+                reason=form.cleaned_data.get("reason", ""),
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return render(
+                request,
+                "thinking/claim_merge_preview.html",
+                _claim_merge_preview_context(form=form, search_query=search_query),
+            )
+        return redirect("thinking:claim_merge_preview")
+
+
+class ClaimDuplicateReviewPreviewView(_StaffRequiredMixin, FormView):
+    template_name = "thinking/claim_duplicate_review.html"
+    form_class = ClaimDuplicateReviewForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["search_query"] = self.request.GET.get("q", "").strip()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(
+            _claim_duplicate_review_context(
+                form=ctx["form"],
+                search_query=self.request.GET.get("q", "").strip(),
+            )
+        )
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class ClaimDuplicateReviewView(_StaffRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        search_query = request.GET.get("q", "").strip()
+        form = ClaimDuplicateReviewForm(request.POST, search_query=search_query)
+        if not form.is_valid():
+            return render(
+                request,
+                "thinking/claim_duplicate_review.html",
+                _claim_duplicate_review_context(form=form, search_query=search_query),
+            )
+        try:
+            review_duplicate_pair(
+                claim_a=form.cleaned_data["claim_a"],
+                claim_b=form.cleaned_data["claim_b"],
+                decision=form.cleaned_data["decision"],
+                reviewed_by=request.user,
+                reason=form.cleaned_data.get("reason", ""),
+                merge_func=merge_claims,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return render(
+                request,
+                "thinking/claim_duplicate_review.html",
+                _claim_duplicate_review_context(form=form, search_query=search_query),
+            )
+        return redirect("thinking:claim_duplicate_review_preview")
+
+
+class ArgumentClaimConvertView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        argument = get_object_or_404(Argument, pk=kwargs.get("pk"))
+        try:
+            create_claim_from_argument(argument=argument, author=request.user)
+        except ValidationError:
+            pass
+        return redirect("thinking:thesis_detail", pk=argument.thesis_id)
+
+
+class CounterClaimConvertView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        counter = get_object_or_404(Counter, pk=kwargs.get("pk"))
+        try:
+            create_claim_from_counter(counter=counter, author=request.user)
+        except ValidationError:
+            pass
+        return redirect("thinking:thesis_detail", pk=counter.thesis_id)
 
 
 @role_required(*MODERATION_ROLES)
@@ -694,38 +1055,13 @@ class _ReportCreateView(LoginRequiredMixin, View):
         if not allow_report_submit(getattr(request.user, "id", None)):
             return redirect(return_url)
 
-        reason = request.POST.get("reason", "").strip().lower()
-        if reason not in REPORT_REASONS:
-            reason = "other"
-        detail = request.POST.get("detail", "").strip()
-        role_obj = ensure_user_role(request.user)
-        reporter_role = role_obj.role if role_obj else ""
-        target_fk_name = (
-            "thesis"
-            if self.target_type == ContentReport.TargetType.THESIS
-            else "counter"
+        result = submit_content_report(
+            request=request,
+            target=target,
+            target_type=self.target_type,
+            allowed_reasons=REPORT_REASONS,
         )
-        target_lookup = {target_fk_name: target}
-        report_kwargs = {
-            "reporter": request.user,
-            "reporter_role": reporter_role,
-            "reason": reason,
-            "detail": detail,
-            "ip_address": get_client_ip(request),
-            "user_agent": request.META.get("HTTP_USER_AGENT", ""),
-            **target_lookup,
-        }
-        created = False
-        try:
-            _, created = ContentReport.objects.get_or_create(
-                reporter=request.user,
-                status=ContentReport.Status.OPEN,
-                defaults=report_kwargs,
-                **target_lookup,
-            )
-        except IntegrityError:
-            created = False
-        if created:
+        if result["created"]:
             log_action(
                 actor=request.user,
                 action="content.report_submitted",
@@ -733,14 +1069,10 @@ class _ReportCreateView(LoginRequiredMixin, View):
                 metadata={
                     "target_type": self.target_type,
                     "target_id": str(target.pk),
-                    "reason": reason,
+                    "reason": result["reason"],
                 },
                 request=request,
             )
-        maybe_auto_moderate_after_report(
-            target=target,
-            request=request,
-        )
         return redirect(return_url)
 
 
@@ -761,12 +1093,12 @@ class _ModerationReportUpdateView(RoleRequiredMixin, View):
 
     def post(self, request, *_args, **kwargs):
         report = get_object_or_404(ContentReport, pk=kwargs.get("pk"))
-        if report.status != ContentReport.Status.OPEN:
+        if not apply_report_status(
+            report=report,
+            next_status=self.next_status,
+            actor=request.user,
+        ):
             return redirect("thinking:moderation_panel")
-        report.status = self.next_status
-        report.resolved_at = timezone.now()
-        report.resolved_by = request.user
-        report.save(update_fields=["status", "resolved_at", "resolved_by"])
         log_action(
             actor=request.user,
             action=self.audit_action,
@@ -830,30 +1162,22 @@ class ModerationReportBulkUpdateView(RoleRequiredMixin, View):
             )
 
         next_status, audit_action = self.ACTION_TO_STATUS[action]
-        with transaction.atomic():
-            locked_reports = list(
-                ContentReport.objects.select_for_update()
-                .filter(id__in=report_ids)
-                .order_by("id")
+        for report in bulk_apply_report_status(
+            report_ids=report_ids,
+            next_status=next_status,
+            actor=request.user,
+        ):
+            log_action(
+                actor=request.user,
+                action=audit_action,
+                metadata={
+                    "report_id": report.id,
+                    "target_type": report.target_type,
+                    "target_id": report.target_id,
+                    "reason": report.reason,
+                },
+                request=request,
             )
-            for report in locked_reports:
-                if report.status != ContentReport.Status.OPEN:
-                    continue
-                report.status = next_status
-                report.resolved_at = timezone.now()
-                report.resolved_by = request.user
-                report.save(update_fields=["status", "resolved_at", "resolved_by"])
-                log_action(
-                    actor=request.user,
-                    action=audit_action,
-                    metadata={
-                        "report_id": report.id,
-                        "target_type": report.target_type,
-                        "target_id": report.target_id,
-                        "reason": report.reason,
-                    },
-                    request=request,
-                )
         return self._redirect(request)
 
 
