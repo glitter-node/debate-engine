@@ -1,14 +1,16 @@
 # Debate Engine - Glitter.im
 
-**Debate Domain Prototype for Structured Debate Engine**
+**Debate Domain Prototype**
 
-Project site: https://glitter.im
+Website: https://glitter.im
 
-This engine is **a prototype exploring debate-domain modeling** for structured discussion systems.
+This project explores **debate-domain modeling** for structured discussion systems.
 
-Instead of representing discussions as flat comment threads, this project models debates as **explicit domain entities with moderation and policy logic built into the model**.
+Instead of storing discussions as chronological comment threads,
+debates are modeled as **explicit argument structures**.
 
-This repository is **not intended to be a finished discussion platform**. It is primarily a **domain-modeling experiment** around structured debate systems.
+This repository is **not intended to be a finished discussion platform**,
+but a prototype for experimenting with **structured debate models**.
 
 ---
 
@@ -27,13 +29,13 @@ However, real discussions usually have structure:
 
 These structures often exist implicitly but are rarely modeled explicitly.
 
-Glitter explores what happens when **discussion systems treat debate structure as a first-class domain model**.
+Glitter experiments with treating debate structure as **a first-class domain model**.
 
 ---
 
 ## Core Domain Model
 
-The prototype models discussions using several primary entities.
+The prototype represents discussions using several primary entities.
 
 ```text
 Thesis
@@ -61,7 +63,7 @@ The goal is to represent **debate structure rather than a flat comment tree**.
 
 ## Architecture
 
-The project is gradually evolving toward a reusable debate-domain module.
+The debate domain is implemented as a modular component within the project.
 
 ```text
 thinking/
