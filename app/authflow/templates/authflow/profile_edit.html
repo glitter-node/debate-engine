@@ -1,0 +1,11 @@
+<form method="post">
+  {% csrf_token %}
+
+  <label>Username</label>
+  <input name="username" value="{{ user.username }}" />
+
+  <label>Email</label>
+  <input name="email" value="{{ user.email }}" />
+
+  <button type="submit">Save</button>
+</form>

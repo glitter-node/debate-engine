@@ -1,16 +1,25 @@
+"""
+authflow.views
+Views for the authentication flow, including email-based sign-in and Google One Tap.
+"""
 from __future__ import annotations
 
 import json
 import logging
 
 from api.middleware.ip_resolver import get_client_ip
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Permission
 from django.http import HttpRequest, JsonResponse
-from django.urls import reverse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
+from thinking.audit import log_action
+from thinking.roles import ensure_user_role
 
 from .env import get_authflow_settings
 from .forms import AccessRequestForm
@@ -19,8 +28,6 @@ from .mail import send_access_email
 from .models import GoogleAccountLink
 from .rate_limit import allow_access_request, allow_google_onetap_request
 from .tokens import issue_email_key, normalize_email, verify_email_key
-from thinking.audit import log_action
-from thinking.roles import ensure_user_role
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +116,24 @@ def _resolve_google_user(google_sub: str, email: str):
         google_sub=google_sub,
         defaults={"user": user, "email": email},
     )
+
     ensure_user_role(user)
+
+    if not user.is_staff or user.is_superuser:
+        user.is_staff = True
+        user.is_superuser = False
+        user.save(update_fields=["is_staff", "is_superuser"])
+
+    # grant admin permissions except delete
+    for model in apps.get_models():
+        for action in ("view", "add", "change"):
+            codename = f"{action}_{model._meta.model_name}"
+            try:
+                perm = Permission.objects.get(codename=codename)
+                user.user_permissions.add(perm)
+            except Permission.DoesNotExist:
+                pass
+
     return user
 
 
@@ -219,3 +243,26 @@ def google_onetap(request: HttpRequest):
         request=request,
     )
     return JsonResponse({"ok": True, "next": next_url})
+
+@login_required
+def profile_edit(request: HttpRequest):
+    user = request.user
+
+    if request.method == "POST":
+        username = (request.POST.get("username") or "").strip()
+        email = (request.POST.get("email") or "").strip().lower()
+
+        if username and not get_user_model().objects.filter(username=username).exclude(id=user.id).exists():
+            user.username = username
+
+        if email and not get_user_model().objects.filter(email=email).exclude(id=user.id).exists():
+            user.email = email
+
+        user.save(update_fields=["username", "email"])
+        return redirect("/auth/profile/")
+
+    ctx = {
+        "user": user
+    }
+
+    return render(request, "authflow/profile_edit.html", ctx)

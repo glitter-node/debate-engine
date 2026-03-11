@@ -8,8 +8,11 @@ from __future__ import annotations
 import os
 
 from DjangoProto8.config import BASE_DIR, load_dotenv, parse_bool, parse_csv
+from version import get_app_version
 
 load_dotenv()
+
+APP_VERSION = get_app_version()
 
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 DEBUG = parse_bool(
@@ -26,7 +29,7 @@ if not SECRET_KEY:
         raise RuntimeError("DJANGO_SECRET_KEY is required when DJANGO_DEBUG is false.")
 
 ALLOWED_HOSTS = parse_csv(os.environ.get("DJANGO_ALLOWED_HOSTS")) or [
-    "djangoproto8.glitter.im",
+    "djangoproto8.glitter.kr",
 ]
 if APP_ENV in {"development", "dev", "local", "test"}:
     for _host in ("127.0.0.1", "localhost"):
@@ -75,6 +78,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "context_processors.app_version",
                 "DjangoProto8.context_processors.global_template_context",
             ],
         },
@@ -137,7 +141,7 @@ CORS_ALLOWED_ORIGINS = parse_csv(os.environ.get("CORS_ALLOWED_ORIGINS"))
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_TRUSTED_ORIGINS = parse_csv(os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS")) or [
-    "https://djangoproto8.glitter.im",
+    "https://djangoproto8.glitter.kr",
 ]
 
 SECURE_SSL_REDIRECT = not DEBUG

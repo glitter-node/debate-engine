@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 from django.views.generic.base import RedirectView
+from views.version import app_version
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -15,6 +16,8 @@ urlpatterns = [
     path("favicon.ico", api_views.favicon),
     path("robots.txt", api_views.robots_txt),
     path("sitemap.xml", api_views.sitemap_xml),
+    path("api/version", app_version),
+    path("api/version/", app_version),
     path("api/", include("api.urls")),
     path("", include("thinking.urls")),
 ]
