@@ -239,7 +239,7 @@ Feedback is welcome, especially regarding:
 ## Resources
 
 **Website**  
-[glitter.im](https://djangoproto8.glitter.im)
+[glitter.im](https://djangoproto8.glitter.kr)
 
 **Repository**  
 [Debate Engine](https://github.com/glitter-node/debate-engine)
