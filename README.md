@@ -35,7 +35,7 @@ Glitter experiments with treating debate structure as **a first-class domain mod
 
 The prototype represents discussions using several primary entities.
 
-```text
+```
 Thesis
 ├─ Argument
 │  └─ Counter
@@ -63,7 +63,7 @@ The goal is to represent **debate structure rather than a flat comment tree**.
 
 The debate domain is implemented as a modular component within the project.
 
-```text
+```
 thinking/
 ├─ models.py
 │  Domain entities
@@ -104,7 +104,7 @@ thinking/
 
 Traditional forum:
 
-```text
+```
 Post
 └─ Comment
    └─ Reply
@@ -112,7 +112,7 @@ Post
 
 Structured debate model:
 
-```text
+```
 Thesis
 ├─ Argument
 │  └─ Counter
